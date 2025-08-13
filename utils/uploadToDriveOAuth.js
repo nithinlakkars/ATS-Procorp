@@ -3,32 +3,35 @@ import { google } from "googleapis";
 import stream from "stream";
 
 /**
- * Google Drive utility using Service Account via environment variable.
- * No local JSON file needed.
- * 
- * Environment variable required:
- * GOOGLE_CREDENTIALS = JSON content of the service account key
+ * Google Drive utility using OAuth2 client and token from environment variables.
+ * Environment variables required:
+ * GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON
  */
 
-// 1️⃣ Load service account from environment variable
-if (!process.env.GOOGLE_CREDENTIALS) {
-  throw new Error("❌ GOOGLE_CREDENTIALS env variable not set");
+// 1️⃣ Load OAuth2 credentials and token
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON } = process.env;
+
+if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI || !GOOGLE_TOKEN_JSON) {
+  throw new Error("❌ Missing required Google OAuth environment variables");
 }
 
-const serviceAccountKey = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const token = JSON.parse(GOOGLE_TOKEN_JSON);
 
-// 2️⃣ Authenticate with service account
-const auth = new google.auth.GoogleAuth({
-  credentials: serviceAccountKey,
-  scopes: ["https://www.googleapis.com/auth/drive"],
-});
+// 2️⃣ Setup OAuth2 client
+const oAuth2Client = new google.auth.OAuth2(
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_REDIRECT_URI
+);
 
-// 3️⃣ Create drive client
-const drive = google.drive({ version: "v3", auth });
+oAuth2Client.setCredentials(token);
+
+// 3️⃣ Create Drive client
+const drive = google.drive({ version: "v3", auth: oAuth2Client });
 
 /**
  * Create a candidate folder in Google Drive
- * @param {string} folderName - Name of the folder
+ * @param {string} folderName
  * @returns {string} Folder ID
  */
 export const createCandidateFolder = async (folderName) => {
