@@ -1,23 +1,36 @@
+// utils/googleDrive.js
 import { google } from "googleapis";
 import stream from "stream";
 
-// Load service account from environment variable
+/**
+ * Google Drive utility using Service Account via environment variable.
+ * No local JSON file needed.
+ * 
+ * Environment variable required:
+ * GOOGLE_SERVICE_ACCOUNT = JSON content of the service account key
+ */
+
+// 1️⃣ Load service account from environment variable
 if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
   throw new Error("❌ GOOGLE_SERVICE_ACCOUNT env variable not set");
 }
 
-const key = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-// Authenticate with service account
+// 2️⃣ Authenticate with service account
 const auth = new google.auth.GoogleAuth({
-  credentials: key,
+  credentials: serviceAccountKey,
   scopes: ["https://www.googleapis.com/auth/drive"],
 });
 
-// Create drive client
+// 3️⃣ Create drive client
 const drive = google.drive({ version: "v3", auth });
 
-// Create folder
+/**
+ * Create a candidate folder in Google Drive
+ * @param {string} folderName - Name of the folder
+ * @returns {string} Folder ID
+ */
 export const createCandidateFolder = async (folderName) => {
   const folderMetadata = {
     name: folderName,
@@ -33,7 +46,14 @@ export const createCandidateFolder = async (folderName) => {
   return folder.data.id;
 };
 
-// Upload file
+/**
+ * Upload a file to Google Drive
+ * @param {string} filename - Name of the file
+ * @param {Buffer} fileBuffer - File content as buffer
+ * @param {string} mimetype - File MIME type
+ * @param {string} folderId - Google Drive folder ID
+ * @returns {object} Uploaded file info
+ */
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
   const bufferStream = new stream.PassThrough();
   bufferStream.end(fileBuffer);
