@@ -25,9 +25,29 @@ candidateRoutes.post(
 candidateRoutes.post(
   "/recruiter/upload",
   authorizeRole(["recruiter"]),
-  upload.array("resume", 5),
-  uploadCandidateWithResume
+  upload.array("resume", 5), // keeps your array upload
+  async (req, res, next) => {
+    try {
+      console.log("Request body:", req.body);
+      console.log("Files received:", req.files);
+
+      if (!req.files || req.files.length === 0) {
+        throw new Error("No resume files uploaded");
+      }
+
+      const { name, email } = req.body;
+      if (!name || !email) {
+        throw new Error("Name or email missing");
+      }
+
+      // Call your existing controller function
+      await uploadCandidateWithResume(req, res, next);
+    } catch (err) {
+      next(err); // sends error to global error handler in server.js
+    }
+  }
 );
+
 
 candidateRoutes.get(
   "/recruiter/my-candidates/:userEmail",
