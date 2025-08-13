@@ -7,15 +7,15 @@ import stream from "stream";
  * No local JSON file needed.
  * 
  * Environment variable required:
- * GOOGLE_SERVICE_ACCOUNT = JSON content of the service account key
+ * GOOGLE_CREDENTIALS = JSON content of the service account key
  */
 
 // 1️⃣ Load service account from environment variable
-if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
-  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT env variable not set");
+if (!process.env.GOOGLE_CREDENTIALS) {
+  throw new Error("❌ GOOGLE_CREDENTIALS env variable not set");
 }
 
-const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+const serviceAccountKey = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 
 // 2️⃣ Authenticate with service account
 const auth = new google.auth.GoogleAuth({
@@ -32,18 +32,23 @@ const drive = google.drive({ version: "v3", auth });
  * @returns {string} Folder ID
  */
 export const createCandidateFolder = async (folderName) => {
-  const folderMetadata = {
-    name: folderName,
-    mimeType: "application/vnd.google-apps.folder",
-  };
+  try {
+    const folderMetadata = {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+    };
 
-  const folder = await drive.files.create({
-    requestBody: folderMetadata,
-    fields: "id",
-  });
+    const folder = await drive.files.create({
+      requestBody: folderMetadata,
+      fields: "id",
+    });
 
-  console.log("✅ Created folder:", folder.data.id);
-  return folder.data.id;
+    console.log("✅ Created folder:", folder.data.id);
+    return folder.data.id;
+  } catch (error) {
+    console.error("❌ Error creating folder:", error.message);
+    throw error;
+  }
 };
 
 /**
@@ -55,26 +60,30 @@ export const createCandidateFolder = async (folderName) => {
  * @returns {object} Uploaded file info
  */
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
-  const bufferStream = new stream.PassThrough();
-  bufferStream.end(fileBuffer);
+  try {
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(fileBuffer);
 
-  const fileMetadata = {
-    name: filename,
-    parents: [folderId],
-  };
+    const fileMetadata = {
+      name: filename,
+      parents: [folderId],
+    };
 
-  const media = {
-    mimeType: mimetype, // ✅ fixed
-    body: bufferStream,
-  };
+    const media = {
+      mimeType: mimetype,
+      body: bufferStream,
+    };
 
-  const response = await drive.files.create({
-    requestBody: fileMetadata,
-    media,
-    fields: "id, name, webViewLink, webContentLink",
-  });
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media,
+      fields: "id, name, webViewLink, webContentLink",
+    });
 
-  console.log("✅ Uploaded file:", response.data.webViewLink);
-  return response.data;
+    console.log("✅ Uploaded file:", response.data.webViewLink);
+    return response.data;
+  } catch (error) {
+    console.error("❌ Error uploading file:", error.message);
+    throw error;
+  }
 };
-
