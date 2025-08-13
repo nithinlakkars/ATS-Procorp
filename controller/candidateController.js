@@ -68,117 +68,68 @@ export const submitCandidate = async (req, res) => {
 
 export const uploadCandidateWithResume = async (req, res) => {
   try {
-    console.log("🔒 Role Check — required: [ 'recruiter' ]  | user has:", req.user?.role);
+    console.log("🔒 Role Check:", req.user?.role);
     console.log("📥 Request body:", req.body);
-
-    const {
-      name,
-      email,
-      phone,
-      source,
-      requirementId,
-      currentLocation,
-      rate,
-      relocation,
-      passportNumber,
-      last4SSN,
-      visaStatus,
-      linkedinUrl,
-      clientDetails,
-      role,
-      isActive,
-      salesStatus,
-      workAuthorization,
-      forwardToLeads,
-    } = req.body;
 
     const resumeFiles = req.files;
     if (!resumeFiles || resumeFiles.length === 0) {
+      console.log("❌ No resume files provided");
       return res.status(400).json({ error: "At least one resume file is required." });
     }
+    console.log("📁 Resume files received:", resumeFiles.map(f => f.originalname));
 
-    // ✅ Generate unique candidate ID
-    // ⏰ Get time-only string in HHMMSSms format (e.g., 1445122)
+    // Candidate ID
     const now = new Date();
-    const timeOnly = `${now.getHours()}${now.getMinutes()}${now.getSeconds()}${Math.floor(now.getMilliseconds() / 10)}`;
+    const sanitizedName = (req.body.name || "candidate").trim().replace(/[^\w\-]/g, "");
+    const candidateId = `${sanitizedName}_${now.getTime()}`;
+    console.log("🆔 Generated Candidate ID:", candidateId);
 
-    // 🧼 Clean name for ID
-    const sanitizedName = name.trim().replace(/[^\w\-]/g, "");
-
-    // 🆔 Combine to form Candidate ID
-    const candidateId = `${sanitizedName}_${timeOnly}`;
-
-    // 📁 Folder name = email (cleaned)
-    const folderName = email.trim().replace(/[@.]/g, "_").replace(/[^\w\-]/g, "_");
-
-    const folderId = await createCandidateFolder(folderName);
-    const folderLink = `https://drive.google.com/drive/folders/${folderId}`;
-    console.log("📁 Folder created:", folderLink);
-
-    // ✅ Upload resume files to Drive folder
-    await Promise.all(
-      resumeFiles.map(file =>
-        uploadToDrive(file.originalname, file.buffer, file.mimetype, folderId)
-      )
-    );
-
-    // ✅ Normalize requirementId to array
-    const requirementIds = Array.isArray(requirementId) ? requirementId : [requirementId];
-
-    // ✅ Create and save candidate
-    const newCandidate = new Candidate({
-      candidateId,
-      name,
-      email,
-      phone,
-      source,
-      requirementId: requirementIds,
-      currentLocation,
-      rate,
-      relocation,
-      passportnumber: passportNumber,
-      Last4digitsofSSN: last4SSN,
-      VisaStatus: visaStatus,
-      LinkedinUrl: linkedinUrl,
-      clientdetails: clientDetails,
-      role,
-      resumeUrls: [folderLink],
-      folderId,
-      addedBy: req.user?.email,
-      sourceRole: req.user?.role || "recruiter",
-      isActive: isActive === "true" || isActive === true,
-      workAuthorization: Array.isArray(workAuthorization)
-        ? workAuthorization
-        : typeof workAuthorization === "string"
-          ? [workAuthorization]
-          : [],
-      candidate_update: "submitted",
-      status: "submitted",
-    });
-   console.log("🚨 candidate_update value before saving:", newCandidate.candidate_update);
-    await newCandidate.save();
-    console.log("✅ Candidate saved to database");
-
-    // ✅ Optional: notify leads
-    if (Array.isArray(forwardToLeads) && forwardToLeads.length > 0) {
-      await sendEmail({
-        to: forwardToLeads,
-        subject: "New Candidate Submitted",
-        text: `A new candidate ${name} has been submitted for role ${role}.`,
-      });
+    // Drive folder
+    let folderId;
+    try {
+      console.log("📁 Creating folder in Drive...");
+      folderId = await createCandidateFolder(candidateId);
+      console.log("✅ Folder created:", folderId);
+    } catch (driveError) {
+      console.error("❌ Error creating Drive folder:", driveError);
+      return res.status(500).json({ error: "Drive folder creation failed", details: driveError.message });
     }
 
-    res.status(201).json({
-      message: "Candidate uploaded and saved successfully",
-      candidateId,
-      folderLink,
-    });
+    // Upload resumes
+    try {
+      console.log("📤 Uploading resumes to Drive folder...");
+      await Promise.all(
+        resumeFiles.map(file => uploadToDrive(file.originalname, file.buffer, file.mimetype, folderId))
+      );
+      console.log("✅ All resumes uploaded");
+    } catch (uploadError) {
+      console.error("❌ Error uploading to Drive:", uploadError);
+      return res.status(500).json({ error: "Resume upload failed", details: uploadError.message });
+    }
+
+    // Save candidate
+    try {
+      console.log("💾 Saving candidate to database...");
+      const newCandidate = new Candidate({
+        candidateId,
+        name: req.body.name,
+        email: req.body.email,
+        resumeUrls: [`https://drive.google.com/drive/folders/${folderId}`],
+        folderId,
+        addedBy: req.user?.email,
+        sourceRole: req.user?.role || "recruiter",
+      });
+      await newCandidate.save();
+      console.log("✅ Candidate saved:", newCandidate._id);
+    } catch (dbError) {
+      console.error("❌ Database error:", dbError);
+      return res.status(500).json({ error: "Failed to save candidate", details: dbError.message });
+    }
+
+    res.status(201).json({ message: "Candidate uploaded successfully", candidateId, folderId });
   } catch (error) {
-    console.error("❌ Upload error:", error);
-    res.status(500).json({
-      error: "Failed to upload candidate resume",
-      details: error.message,
-    });
+    console.error("❌ Unexpected error:", error);
+    res.status(500).json({ error: "Unexpected error occurred", details: error.message });
   }
 };
 
