@@ -98,10 +98,10 @@ export const uploadCandidateWithResume = async (req, res) => {
     // Upload resumes
     try {
       console.log("📤 Uploading resumes to Drive folder...");
-      await Promise.all(
+      const uploadedFiles = await Promise.all(
         resumeFiles.map(file => uploadToDrive(file.originalname, file.buffer, file.mimetype, folderId))
       );
-      console.log("✅ All resumes uploaded");
+      console.log("✅ All resumes uploaded:", uploadedFiles.map(f => f.webViewLink));
     } catch (uploadError) {
       console.error("❌ Error uploading to Drive:", uploadError);
       return res.status(500).json({ error: "Resume upload failed", details: uploadError.message });
@@ -114,11 +114,32 @@ export const uploadCandidateWithResume = async (req, res) => {
         candidateId,
         name: req.body.name,
         email: req.body.email,
+        phone: req.body.phone,
+        source: req.body.source,
+        requirementId: req.body.requirementId,
+        currentLocation: req.body.currentLocation,
+        rate: req.body.rate,
+        relocation: req.body.relocation,
+        passportnumber: req.body.passportNumber,
+        Last4digitsofSSN: req.body.last4SSN,
+        VisaStatus: req.body.visaStatus,
+        LinkedinUrl: req.body.linkedinUrl,
+        clientdetails: req.body.clientDetails,
+        role: req.body.role,
         resumeUrls: [`https://drive.google.com/drive/folders/${folderId}`],
         folderId,
         addedBy: req.user?.email,
         sourceRole: req.user?.role || "recruiter",
+        isActive: req.body.isActive === "true" || req.body.isActive === true,
+        workAuthorization: Array.isArray(req.body.workAuthorization)
+          ? req.body.workAuthorization
+          : typeof req.body.workAuthorization === "string"
+          ? [req.body.workAuthorization]
+          : [],
+        candidate_update: "submitted",
+        status: "submitted",
       });
+
       await newCandidate.save();
       console.log("✅ Candidate saved:", newCandidate._id);
     } catch (dbError) {
@@ -132,7 +153,6 @@ export const uploadCandidateWithResume = async (req, res) => {
     res.status(500).json({ error: "Unexpected error occurred", details: error.message });
   }
 };
-
 
 
 
