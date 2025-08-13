@@ -1,58 +1,41 @@
 // googleDriveService.js
-import { google } from "googleapis";
-import { getAuthenticatedClient } from "../utils/uploadToDriveOAuth.js";
+import stream from "stream";
+import { createCandidateFolder as createFolder, uploadToDrive as uploadFile } from "../utils/googleDrive.js";
 
-import fs from "fs";
-
-// ✅ Create folder
+/**
+ * Create a folder in Google Drive for a candidate
+ * @param {string} candidateId
+ * @returns {Object} { success: boolean, folderId?: string, error?: string }
+ */
 export const createFolderInDrive = async (candidateId) => {
   try {
     console.log("📁 Creating folder in Google Drive...");
 
-    const auth = await getAuthenticatedClient();
-    const drive = google.drive({ version: "v3", auth });
+    const folderName = `candidate_${candidateId}`;
+    const folderId = await createFolder(folderName);
 
-    const folderMetadata = {
-      name: `candidate_${candidateId}`,
-      mimeType: "application/vnd.google-apps.folder",
-    };
-
-    const folder = await drive.files.create({
-      requestBody: folderMetadata,
-      fields: "id",
-    });
-
-    return { success: true, folderId: folder.data.id };
+    return { success: true, folderId };
   } catch (error) {
     console.error("❌ Error in createFolderInDrive:", error.message);
     return { success: false, error: error.message };
   }
 };
 
-// ✅ Upload file to folder
-// ✅ Change this to accept existing folderId — no need to recreate
+/**
+ * Upload a file to an existing Google Drive folder
+ * @param {string} filename - Name of the file
+ * @param {Buffer} fileBuffer - File content as buffer
+ * @param {string} mimetype - MIME type of the file
+ * @param {string} folderId - Google Drive folder ID
+ * @returns {Object} Uploaded file info
+ */
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
-  const auth = await getAuthenticatedClient();
-  const drive = google.drive({ version: "v3", auth });
-
-  const fileMetadata = {
-    name: filename,
-    parents: [folderId], // ✅ Use passed folderId directly
-  };
-
-  const bufferStream = new stream.PassThrough();
-  bufferStream.end(fileBuffer);
-
-  const media = {
-    mimeType: mimetype,
-    body: bufferStream,
-  };
-
-  const response = await drive.files.create({
-    requestBody: fileMetadata,
-    media,
-    fields: "id, name, webViewLink, webContentLink",
-  });
-
-  return response.data;
+  try {
+    const response = await uploadFile(filename, fileBuffer, mimetype, folderId);
+    console.log(`✅ Uploaded file: ${response.webViewLink}`);
+    return response;
+  } catch (error) {
+    console.error("❌ Error uploading file to Drive:", error.message);
+    throw error;
+  }
 };
