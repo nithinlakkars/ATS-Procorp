@@ -1,6 +1,6 @@
 // googleDriveService.js
 import stream from "stream";
-import { createCandidateFolder as createFolder, uploadToDrive as uploadFile } from "../utils/googleDrive.js";
+import { createCandidateFolder as createFolder, uploadToDrive as uploadFile } from "../utils/uploadToDriveOAuth.js";
 
 /**
  * Create a folder in Google Drive for a candidate
