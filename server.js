@@ -31,26 +31,37 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Preflight support for all routes
 app.options("*", cors(corsOptions));
 
-// Logging incoming requests
+// =====================
+// Request-level Debug Logger
+// =====================
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  console.log(`🟢 Incoming request: ${req.method} ${req.originalUrl}`);
+  console.log("Headers:", req.headers);
   next();
 });
 
 // =====================
-// Routes
+// Router Debug Wrapper
 // =====================
-app.use("/api/stats", statsRoutes);
-app.use("/api", router);
+function debugRouter(routerName) {
+  return (req, res, next) => {
+    console.log(`➡️ Router hit: ${routerName} | ${req.method} ${req.originalUrl}`);
+    next();
+  };
+}
+
+// =====================
+// Routes with debug
+// =====================
+app.use("/api/stats", debugRouter("StatsRouter"), statsRoutes);
+app.use("/api", debugRouter("AuthRouter"), router);
 app.use("/uploads", express.static("uploads"));
-app.post("/api/candidates/test/create-drive-folder", testCreateDriveFolder);
-app.use("/api/candidates", authenticateToken, candidateRoutes);
-app.use("/api/test", testRoutes);
-app.use("/api/requirements", requirementRouter);
+app.post("/api/candidates/test/create-drive-folder", debugRouter("TestDriveFolder"), testCreateDriveFolder);
+app.use("/api/candidates", debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
+app.use("/api/test", debugRouter("TestRouter"), testRoutes);
+app.use("/api/requirements", debugRouter("RequirementRouter"), requirementRouter);
 
 // Test endpoint
 app.get("/get", (req, res) => res.status(200).json({ message: "success", status: true }));
@@ -59,6 +70,7 @@ app.get("/get", (req, res) => res.status(200).json({ message: "success", status:
 // 404 Handler
 // =====================
 app.use((req, res, next) => {
+  console.warn(`⚠️ 404 Route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({ error: "Route not found" });
 });
 
@@ -66,15 +78,35 @@ app.use((req, res, next) => {
 // Error Handling Middleware
 // =====================
 app.use((err, req, res, next) => {
-  console.error("🔥 ERROR:", err);
+  console.error("🔥 ERROR Middleware triggered:", err);
   res.status(500).json({ error: err.message || "Internal Server Error" });
+});
+
+// =====================
+// Print all registered routes
+// =====================
+console.log("📌 Registered routes:");
+app._router.stack.forEach((middleware) => {
+  if (middleware.route) {
+    console.log(middleware.route);
+  } else if (middleware.name === "router") {
+    middleware.handle.stack.forEach((handler) => {
+      if (handler.route) {
+        console.log(handler.route);
+      }
+    });
+  }
 });
 
 // =====================
 // Start Server
 // =====================
-connect();
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log("✅ Server is running on port", PORT);
-});
+try {
+  connect();
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log("✅ Server is running on port", PORT);
+  });
+} catch (err) {
+  console.error("🔥 Server failed to start:", err);
+}
