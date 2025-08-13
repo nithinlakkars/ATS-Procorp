@@ -11,7 +11,7 @@ import {
   viewUnassignedLeads,
   recruiterViewRequirements,
   authenticatedLeadRequirements,
-  updateRequirementStatus, // ✅ new
+  updateRequirementStatus,
 } from "../controller/requirementController.js";
 
 import authorizeRole from "../middleware/authorizeRole.js";
@@ -20,6 +20,7 @@ import authenticateToken from "../middleware/authenticateToken.js";
 
 const requirementRouter = express.Router();
 
+// ------------------- SALES -------------------
 requirementRouter.post(
   "/sales/submit",
   authMiddleware(["sales", "lead", "admin"]),
@@ -33,76 +34,70 @@ requirementRouter.get(
   viewSalesRequirements
 );
 
-
-// ✅ New route for updating status
+// ------------------- REQUIREMENT STATUS -------------------
 requirementRouter.put(
   "/update-status",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRole(["admin"]),
   updateRequirementStatus
 );
 
-// Other routes...
+// ------------------- LEADS -------------------
 requirementRouter.get(
   "/leads/unassigned",
   authenticateToken,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   unassignedRequirements
 );
 
 requirementRouter.put(
   "/leads/assign-multiple",
   authenticateToken,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   assignMultipleRequirements
 );
 
 requirementRouter.get(
   "/leads/my",
   authenticateToken,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   myLeadRequirements
 );
 
 requirementRouter.put(
   "/leads/assign/:reqId",
   authenticateToken,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   assignRequirement
 );
 
 requirementRouter.get(
   "/leads/view-all",
   authenticateToken,
-  authorizeRole("admin"),
+  authorizeRole(["admin"]),
   viewAllRequirements
 );
 
 requirementRouter.get(
   "/leads/view",
   authenticateToken,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   viewUnassignedLeads
-);
-
-requirementRouter.get(
-  "/recruiter/view",
-  authenticateToken,
-  authorizeRole("recruiter"),
-  recruiterViewRequirements
 );
 
 requirementRouter.get(
   "/leads/view-auth",
   authMiddleware,
-  authorizeRole("lead"),
+  authorizeRole(["lead"]),
   authenticatedLeadRequirements
 );
+
+// ------------------- RECRUITER -------------------
 requirementRouter.get(
-  "/sales/view",
+  "/recruiter/view",
   authenticateToken,
-  authorizeRole(["admin", "sales"]),
-  viewSalesRequirements
+  authorizeRole(["recruiter"]),
+  recruiterViewRequirements
 );
 
 export default requirementRouter;
