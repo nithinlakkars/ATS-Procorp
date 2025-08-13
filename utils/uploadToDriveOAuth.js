@@ -64,7 +64,7 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
   };
 
   const media = {
-    mimeType,
+    mimeType: mimetype, // ✅ fixed
     body: bufferStream,
   };
 
@@ -77,3 +77,4 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
   console.log("✅ Uploaded file:", response.data.webViewLink);
   return response.data;
 };
+
