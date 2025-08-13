@@ -14,16 +14,30 @@ dotenv.config();
 const app = express();
 
 // =====================
+// Debug wrapper for app.use
+// =====================
+const originalUse = app.use.bind(app);
+app.use = (...args) => {
+  if (args[0] && typeof args[0] === "string") {
+    // Log the path used
+    console.log("🔍 app.use called with path:", args[0]);
+    if (args[0].startsWith("http://") || args[0].startsWith("https://")) {
+      console.error("❌ WARNING: Full URL used in app.use! This will break path-to-regexp:", args[0]);
+    }
+  }
+  return originalUse(...args);
+};
+
+// =====================
 // Middleware
 // =====================
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // for form-data
+app.use(express.urlencoded({ extended: true }));
 
-// Allowed origins
 const corsOptions = {
   origin: [
-    "https://procorp-ats-frontend.onrender.com", // production frontend
-    "http://localhost:3000", // local testing
+    "https://procorp-ats-frontend.onrender.com",
+    "http://localhost:3000",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -37,7 +51,6 @@ app.options("*", cors(corsOptions));
 // =====================
 app.use((req, res, next) => {
   console.log(`🟢 Incoming request: ${req.method} ${req.originalUrl}`);
-  console.log("Headers:", req.headers);
   next();
 });
 
@@ -57,16 +70,12 @@ function debugRouter(routerName) {
 const API_BASE = process.env.API_BASE || "/api";
 
 // =====================
-// Routes with debug
+// Routes
 // =====================
 app.use(`${API_BASE}/stats`, debugRouter("StatsRouter"), statsRoutes);
 app.use(`${API_BASE}`, debugRouter("AuthRouter"), router);
 app.use("/uploads", express.static("uploads"));
-app.post(
-  `${API_BASE}/candidates/test/create-drive-folder`,
-  debugRouter("TestDriveFolder"),
-  testCreateDriveFolder
-);
+app.post(`${API_BASE}/candidates/test/create-drive-folder`, debugRouter("TestDriveFolder"), testCreateDriveFolder);
 app.use(`${API_BASE}/candidates`, debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
 app.use(`${API_BASE}/test`, debugRouter("TestRouter"), testRoutes);
 app.use(`${API_BASE}/requirements`, debugRouter("RequirementRouter"), requirementRouter);
