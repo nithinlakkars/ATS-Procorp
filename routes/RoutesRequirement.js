@@ -1,100 +1,103 @@
-import { Router } from "express";
-import authenticateToken from "../middleware/authenticateToken.js";
-import authorizeRole from "../middleware/authorizeRole.js";
-import { authMiddleware } from "../middleware/authMiddleware.js";
-
+// routes/requirementRoutes.js
+import express from "express";
 import {
-  assignMultipleRequirements,
-  assignRequirement,
-  authenticatedLeadRequirements,
-  myLeadRequirements,
-  recruiterViewRequirements,
   submitRequirement,
-  unassignedRequirements,
-  viewAllRequirements,
   viewSalesRequirements,
+  unassignedRequirements,
+  myLeadRequirements,
+  assignRequirement,
+  assignMultipleRequirements,
+  viewAllRequirements,
   viewUnassignedLeads,
+  recruiterViewRequirements,
+  authenticatedLeadRequirements,
+  updateRequirementStatus,
 } from "../controller/requirementController.js";
 
-const routerRequirement = Router();
+import authorizeRole from "../middleware/authorizeRole.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import authenticateToken from "../middleware/authenticateToken.js";
 
-// 🎯 Sales submits a requirement
-routerRequirement.post(
+const requirementRouter = express.Router();
+
+// ------------------- SALES -------------------
+requirementRouter.post(
   "/sales/submit",
-  authenticateToken,
-  authorizeRole(["sales", "lead", "admin"]),
+  authMiddleware(["sales", "lead", "admin"]),
   submitRequirement
 );
 
-// 📋 View sales-posted requirements (admin only)
-routerRequirement.get(
+requirementRouter.get(
   "/sales/view",
   authenticateToken,
-  authorizeRole(["admin"]),
+  authorizeRole(["admin", "sales"]),
   viewSalesRequirements
 );
 
-// 🚫 View unassigned requirements (for a lead)
-routerRequirement.get(
+// ------------------- REQUIREMENT STATUS -------------------
+requirementRouter.put(
+  "/update-status",
+  authenticateToken,
+  authorizeRole(["admin"]),
+  updateRequirementStatus
+);
+
+// ------------------- LEADS -------------------
+requirementRouter.get(
   "/leads/unassigned",
   authenticateToken,
   authorizeRole(["lead"]),
   unassignedRequirements
 );
 
-// 👤 View my assigned requirements (lead)
-routerRequirement.get(
-  "/leads/my",
-  authenticateToken,
-  authorizeRole(["lead"]),
-  myLeadRequirements
-);
-
-// 🔗 Assign one requirement to recruiters (lead)
-routerRequirement.put(
-  "/leads/assign/:reqId",
-  authenticateToken,
-  authorizeRole(["lead"]),
-  assignRequirement
-);
-
-// 🔗 Assign multiple requirements (lead)
-routerRequirement.put(
+requirementRouter.put(
   "/leads/assign-multiple",
   authenticateToken,
   authorizeRole(["lead"]),
   assignMultipleRequirements
 );
 
-// 🌍 Admin views all requirements
-routerRequirement.get(
+requirementRouter.get(
+  "/leads/my",
+  authenticateToken,
+  authorizeRole(["lead"]),
+  myLeadRequirements
+);
+
+requirementRouter.put(
+  "/leads/assign/:reqId",
+  authenticateToken,
+  authorizeRole(["lead"]),
+  assignRequirement
+);
+
+requirementRouter.get(
   "/leads/view-all",
   authenticateToken,
   authorizeRole(["admin"]),
   viewAllRequirements
 );
 
-// 📭 Leads view requirements they haven’t assigned recruiters to
-routerRequirement.get(
+requirementRouter.get(
   "/leads/view",
   authenticateToken,
   authorizeRole(["lead"]),
   viewUnassignedLeads
 );
 
-// 👀 Recruiter views assigned requirements
-routerRequirement.get(
+requirementRouter.get(
+  "/leads/view-auth",
+  authMiddleware,
+  authorizeRole(["lead"]),
+  authenticatedLeadRequirements
+);
+
+// ------------------- RECRUITER -------------------
+requirementRouter.get(
   "/recruiter/view",
   authenticateToken,
   authorizeRole(["recruiter"]),
   recruiterViewRequirements
 );
 
-// 🔒 Authenticated lead requirement view (middleware-based)
-routerRequirement.get(
-  "/leads/view-auth",
-  authMiddleware,
-  authenticatedLeadRequirements
-);
-
-export default routerRequirement;
+export default requirementRouter;
