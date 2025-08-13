@@ -29,7 +29,6 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 };
-
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -53,15 +52,24 @@ function debugRouter(routerName) {
 }
 
 // =====================
+// API Base Path from ENV
+// =====================
+const API_BASE = process.env.API_BASE || "/api";
+
+// =====================
 // Routes with debug
 // =====================
-app.use("/api/stats", debugRouter("StatsRouter"), statsRoutes);
-app.use("/api", debugRouter("AuthRouter"), router);
+app.use(`${API_BASE}/stats`, debugRouter("StatsRouter"), statsRoutes);
+app.use(`${API_BASE}`, debugRouter("AuthRouter"), router);
 app.use("/uploads", express.static("uploads"));
-app.post("/api/candidates/test/create-drive-folder", debugRouter("TestDriveFolder"), testCreateDriveFolder);
-app.use("/api/candidates", debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
-app.use("/api/test", debugRouter("TestRouter"), testRoutes);
-app.use("/api/requirements", debugRouter("RequirementRouter"), requirementRouter);
+app.post(
+  `${API_BASE}/candidates/test/create-drive-folder`,
+  debugRouter("TestDriveFolder"),
+  testCreateDriveFolder
+);
+app.use(`${API_BASE}/candidates`, debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
+app.use(`${API_BASE}/test`, debugRouter("TestRouter"), testRoutes);
+app.use(`${API_BASE}/requirements`, debugRouter("RequirementRouter"), requirementRouter);
 
 // Test endpoint
 app.get("/get", (req, res) => res.status(200).json({ message: "success", status: true }));
@@ -106,6 +114,7 @@ try {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log("✅ Server is running on port", PORT);
+    console.log(`🌐 API Base Path: ${API_BASE}`);
   });
 } catch (err) {
   console.error("🔥 Server failed to start:", err);
