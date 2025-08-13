@@ -1,6 +1,8 @@
-// googleDriveService.js
 import stream from "stream";
-import { createCandidateFolder as createFolder, uploadToDrive as uploadFile } from "../utils/uploadToDriveOAuth.js";
+import { 
+  createCandidateFolder as createFolder, 
+  uploadToDrive as uploadFile 
+} from "../utils/uploadToDriveOAuth.js";
 
 /**
  * Create a folder in Google Drive for a candidate
@@ -14,6 +16,7 @@ export const createFolderInDrive = async (candidateId) => {
     const folderName = `candidate_${candidateId}`;
     const folderId = await createFolder(folderName);
 
+    console.log("✅ Folder created:", folderId);
     return { success: true, folderId };
   } catch (error) {
     console.error("❌ Error in createFolderInDrive:", error.message);
