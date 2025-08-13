@@ -8,10 +8,23 @@ const TOKEN_PATH = path.join(path.resolve(), "config", "token.json");
 const CREDENTIALS_PATH = path.join(path.resolve(), "config", "client_secret.json");
 
 export const getAuthenticatedClient = async () => {
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
+  let credentials;
+
+  if (process.env.GOOGLE_CREDENTIALS) {
+    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+  } else {
+    // fallback for local dev
+    credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
+  }
+
   const { client_secret, client_id, redirect_uris } = credentials.web;
 
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  // Pick correct redirect URI depending on environment
+  const redirectUri = process.env.NODE_ENV === "production"
+    ? "https://procorp-ats.onrender.com/oauth2callback"
+    : redirect_uris[0];
+
+  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
   if (fs.existsSync(TOKEN_PATH)) {
     const token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
@@ -22,6 +35,7 @@ export const getAuthenticatedClient = async () => {
 
   return oAuth2Client;
 };
+
 
 export const createCandidateFolder = async (candidateId) => {
   const auth = await getAuthenticatedClient();

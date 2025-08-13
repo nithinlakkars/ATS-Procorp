@@ -11,6 +11,8 @@ import { testCreateDriveFolder } from "./controller/candidateController.js";
 import statsRoutes from "./routes/stats.routes.js";
 
 
+
+
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -34,7 +36,10 @@ app.post("/api/candidates/test/create-drive-folder", testCreateDriveFolder);
 app.use("/api/candidates", authenticateToken, candidateRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/requirements", requirementRouter); // ✅ only once
-
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+  next();
+});
 app.get("/get", (req, res) => {
   return res.status(200).json({ message: "success", status: true });
 });
