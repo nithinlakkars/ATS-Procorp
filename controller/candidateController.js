@@ -88,7 +88,12 @@ export const uploadCandidateWithResume = async (req, res) => {
     let folderId;
     try {
       console.log("📁 Creating folder in Drive...");
-      folderId = await createCandidateFolder(candidateId);
+      const folderRes = await createFolderInDrive(candidateId);
+      if (!folderRes.success) {
+        console.error("❌ Drive folder creation failed:", folderRes.error);
+        return res.status(500).json({ error: "Drive folder creation failed", details: folderRes.error });
+      }
+      folderId = folderRes.folderId;
       console.log("✅ Folder created:", folderId);
     } catch (driveError) {
       console.error("❌ Error creating Drive folder:", driveError);
@@ -153,8 +158,6 @@ export const uploadCandidateWithResume = async (req, res) => {
     res.status(500).json({ error: "Unexpected error occurred", details: error.message });
   }
 };
-
-
 
 
 
