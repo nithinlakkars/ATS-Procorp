@@ -16,7 +16,7 @@ const app = express();
 app.use(express.json());
 
 const corsOptions = {
-  origin: "http://localhost:3000",
+  origin: "https://procorp-ats-frontend.onrender.com",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
