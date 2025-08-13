@@ -1,66 +1,26 @@
-// utils/googleDrive.js
-import fs from "fs";
-import path from "path";
 import { google } from "googleapis";
 import stream from "stream";
 
-// Local file paths (used only in development)
-const TOKEN_PATH = path.join(path.resolve(), "config", "token.json");
-const CREDENTIALS_PATH = path.join(path.resolve(), "config", "client_secret.json");
+// Load service account from environment variable
+if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+  throw new Error("❌ GOOGLE_SERVICE_ACCOUNT env variable not set");
+}
 
-/**
- * Get authenticated Google OAuth client
- */
-export const getAuthenticatedClient = async () => {
-  let credentials;
+const key = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-  // 1️⃣ Load credentials
-  if (process.env.GOOGLE_CREDENTIALS) {
-    console.log("✅ Using GOOGLE_CREDENTIALS from environment");
-    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-  } else if (fs.existsSync(CREDENTIALS_PATH)) {
-    console.log("📄 Using local client_secret.json");
-    credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
-  } else {
-    throw new Error("❌ Google credentials not found (GOOGLE_CREDENTIALS env var or local file).");
-  }
+// Authenticate with service account
+const auth = new google.auth.GoogleAuth({
+  credentials: key,
+  scopes: ["https://www.googleapis.com/auth/drive"],
+});
 
-  const { client_secret, client_id, redirect_uris } = credentials.web;
+// Create drive client
+const drive = google.drive({ version: "v3", auth });
 
-  // 2️⃣ Determine redirect URI
-  const redirectUri =
-    process.env.NODE_ENV === "production"
-      ? "https://procorp-ats.onrender.com/oauth2callback"
-      : redirect_uris[0];
-
-  const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
-
-  // 3️⃣ Load token
-  let token;
-  if (process.env.GOOGLE_TOKEN) {
-    console.log("✅ Using GOOGLE_TOKEN from environment");
-    token = JSON.parse(process.env.GOOGLE_TOKEN);
-  } else if (fs.existsSync(TOKEN_PATH)) {
-    console.log("📄 Using local token.json");
-    token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
-  } else {
-    throw new Error("❌ Google token not found (GOOGLE_TOKEN env var or local file).");
-  }
-
-  // 4️⃣ Set credentials
-  oAuth2Client.setCredentials(token);
-  return oAuth2Client;
-};
-
-/**
- * Create a candidate folder in Google Drive
- */
-export const createCandidateFolder = async (candidateId) => {
-  const auth = await getAuthenticatedClient();
-  const drive = google.drive({ version: "v3", auth });
-
+// Create folder
+export const createCandidateFolder = async (folderName) => {
   const folderMetadata = {
-    name: `candidate_${candidateId}`,
+    name: folderName,
     mimeType: "application/vnd.google-apps.folder",
   };
 
@@ -69,17 +29,12 @@ export const createCandidateFolder = async (candidateId) => {
     fields: "id",
   });
 
-  console.log("✅ Created new folder:", folder.data.id);
+  console.log("✅ Created folder:", folder.data.id);
   return folder.data.id;
 };
 
-/**
- * Upload a file to Google Drive
- */
+// Upload file
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
-  const auth = await getAuthenticatedClient();
-  const drive = google.drive({ version: "v3", auth });
-
   const bufferStream = new stream.PassThrough();
   bufferStream.end(fileBuffer);
 
@@ -89,14 +44,14 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
   };
 
   const media = {
-    mimeType: mimetype,
+    mimeType,
     body: bufferStream,
   };
 
   const response = await drive.files.create({
     requestBody: fileMetadata,
     media,
-    fields: "id, name, webViewLink, webContentLink, parents",
+    fields: "id, name, webViewLink, webContentLink",
   });
 
   console.log("✅ Uploaded file:", response.data.webViewLink);
