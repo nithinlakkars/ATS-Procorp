@@ -72,13 +72,13 @@ const API_BASE = process.env.API_BASE || "/api";
 // =====================
 // Routes
 // =====================
-app.use(`${API_BASE}/stats`, debugRouter("StatsRouter"), statsRoutes);
-app.use(`${API_BASE}`, debugRouter("AuthRouter"), router);
-app.use("/uploads", express.static("uploads"));
-app.post(`${API_BASE}/candidates/test/create-drive-folder`, debugRouter("TestDriveFolder"), testCreateDriveFolder);
-app.use(`${API_BASE}/candidates`, debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
-app.use(`${API_BASE}/test`, debugRouter("TestRouter"), testRoutes);
-app.use(`${API_BASE}/requirements`, debugRouter("RequirementRouter"), requirementRouter);
+// app.use(`${API_BASE}/stats`, debugRouter("StatsRouter"), statsRoutes);
+// app.use(`${API_BASE}`, debugRouter("AuthRouter"), router);
+// app.use("/uploads", express.static("uploads"));
+// app.post(`${API_BASE}/candidates/test/create-drive-folder`, debugRouter("TestDriveFolder"), testCreateDriveFolder);
+// app.use(`${API_BASE}/candidates`, debugRouter("CandidatesRouter"), authenticateToken, candidateRoutes);
+// app.use(`${API_BASE}/test`, debugRouter("TestRouter"), testRoutes);
+// app.use(`${API_BASE}/requirements`, debugRouter("RequirementRouter"), requirementRouter);
 
 // Test endpoint
 app.get("/get", (req, res) => res.status(200).json({ message: "success", status: true }));
