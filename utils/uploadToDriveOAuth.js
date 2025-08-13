@@ -26,12 +26,19 @@ export const getAuthenticatedClient = async () => {
 
   const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
-  if (fs.existsSync(TOKEN_PATH)) {
-    const token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
-    oAuth2Client.setCredentials(token);
+  let token;
+  if (process.env.GOOGLE_TOKEN) {
+    // Production: read token from environment variable
+    token = JSON.parse(process.env.GOOGLE_TOKEN);
+  } else if (fs.existsSync(TOKEN_PATH)) {
+    // Local development: read token from file
+    token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
   } else {
-    throw new Error("❌ Token file not found.");
+    throw new Error("❌ Token not found in environment or local file.");
   }
+
+  oAuth2Client.setCredentials(token);
+
 
   return oAuth2Client;
 };
