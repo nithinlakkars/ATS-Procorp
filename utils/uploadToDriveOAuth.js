@@ -1,14 +1,7 @@
-// utils/googleDrive.js
 import { google } from "googleapis";
 import stream from "stream";
 
-/**
- * Google Drive utility using OAuth2 client and token from environment variables.
- * Environment variables required:
- * GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON
- */
-
-// 1️⃣ Load OAuth2 credentials and token
+// Load OAuth2 credentials from env
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON } = process.env;
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI || !GOOGLE_TOKEN_JSON) {
@@ -17,28 +10,63 @@ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI || !GOOGL
 
 const token = JSON.parse(GOOGLE_TOKEN_JSON);
 
-// 2️⃣ Setup OAuth2 client
+// Setup OAuth2 client
 const oAuth2Client = new google.auth.OAuth2(
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI
 );
-
 oAuth2Client.setCredentials(token);
 
-// 3️⃣ Create Drive client
+// Create Drive client
 const drive = google.drive({ version: "v3", auth: oAuth2Client });
 
 /**
- * Create a candidate folder in Google Drive
- * @param {string} folderName
- * @returns {string} Folder ID
+ * Get or create the ATS_DOCUMENTS main folder
+ * @returns {Promise<string>} Folder ID
+ */
+export const getMainFolderId = async () => {
+  const mainFolderName = "ATS_DOCUMENTS";
+  try {
+    // 1️⃣ Search for existing ATS_DOCUMENTS folder
+    const res = await drive.files.list({
+      q: `name='${mainFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: "files(id, name)",
+      spaces: "drive",
+    });
+
+    if (res.data.files.length > 0) {
+      console.log(`📂 Main folder already exists: ${res.data.files[0].id}`);
+      return res.data.files[0].id;
+    }
+
+    // 2️⃣ Create it if not found
+    const folder = await drive.files.create({
+      requestBody: {
+        name: mainFolderName,
+        mimeType: "application/vnd.google-apps.folder",
+      },
+      fields: "id",
+    });
+
+    console.log(`✅ Created main folder: ${folder.data.id}`);
+    return folder.data.id;
+  } catch (error) {
+    console.error("❌ Error getting/creating main folder:", error.message);
+    throw error;
+  }
+};
+
+/**
+ * Create a candidate folder inside ATS_DOCUMENTS
  */
 export const createCandidateFolder = async (folderName) => {
   try {
+    const mainFolderId = await getMainFolderId(); // ensure main folder exists
     const folderMetadata = {
       name: folderName,
       mimeType: "application/vnd.google-apps.folder",
+      parents: [mainFolderId], // ✅ Put inside ATS_DOCUMENTS
     };
 
     const folder = await drive.files.create({
@@ -46,21 +74,16 @@ export const createCandidateFolder = async (folderName) => {
       fields: "id",
     });
 
-    console.log("✅ Created folder:", folder.data.id);
+    console.log("✅ Created candidate folder:", folder.data.id);
     return folder.data.id;
   } catch (error) {
-    console.error("❌ Error creating folder:", error.message);
+    console.error("❌ Error creating candidate folder:", error.message);
     throw error;
   }
 };
 
 /**
- * Upload a file to Google Drive
- * @param {string} filename - Name of the file
- * @param {Buffer} fileBuffer - File content as buffer
- * @param {string} mimetype - File MIME type
- * @param {string} folderId - Google Drive folder ID
- * @returns {object} Uploaded file info
+ * Upload a file to a candidate folder
  */
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
   try {
@@ -69,7 +92,7 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
 
     const fileMetadata = {
       name: filename,
-      parents: [folderId],
+      parents: [folderId], // upload into candidate folder
     };
 
     const media = {
