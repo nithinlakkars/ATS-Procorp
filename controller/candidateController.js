@@ -96,19 +96,18 @@ export const uploadCandidateWithResume = async (req, res) => {
     }
 
     // Upload resumes to Drive
-    let uploadedFiles;
     try {
       console.log("📤 Uploading resumes to Drive folder...");
-      uploadedFiles = await Promise.all(
+      await Promise.all(
         resumeFiles.map(file => uploadToDrive(file.originalname, file.buffer, file.mimetype, folderId))
       );
-      console.log("✅ All resumes uploaded:", uploadedFiles.map(f => f.webViewLink));
+      console.log("✅ All resumes uploaded successfully");
     } catch (uploadError) {
       console.error("❌ Error uploading to Drive:", uploadError);
       return res.status(500).json({ error: "Resume upload failed", details: uploadError.message });
     }
 
-    // Save candidate in DB
+    // Save candidate in DB with only subfolder link
     try {
       console.log("💾 Saving candidate to database...");
       const newCandidate = new Candidate({
@@ -127,10 +126,11 @@ export const uploadCandidateWithResume = async (req, res) => {
         LinkedinUrl: req.body.linkedinUrl,
         clientdetails: req.body.clientDetails,
         role: req.body.role,
-        // Store both folder link & file links
-        resumeUrls: uploadedFiles.map(f => f.webViewLink),
-        folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+
+        // ✅ Only store the candidate subfolder link
+        resumeUrls: [`https://drive.google.com/drive/folders/${folderId}`],
         folderId,
+
         addedBy: req.user?.email,
         sourceRole: req.user?.role || "recruiter",
         isActive: req.body.isActive === "true" || req.body.isActive === true,
@@ -150,12 +150,12 @@ export const uploadCandidateWithResume = async (req, res) => {
       return res.status(500).json({ error: "Failed to save candidate", details: dbError.message });
     }
 
+    // Response with only folder link
     res.status(201).json({
       message: "Candidate uploaded successfully",
       candidateId,
       folderId,
       folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
-      fileLinks: uploadedFiles.map(f => f.webViewLink),
     });
   } catch (error) {
     console.error("❌ Unexpected error:", error);
