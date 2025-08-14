@@ -84,26 +84,22 @@ export const uploadCandidateWithResume = async (req, res) => {
     const candidateId = `${sanitizedName}_${now.getTime()}`;
     console.log("🆔 Generated Candidate ID:", candidateId);
 
-    // Drive folder
+    // Create candidate folder inside ATS_DOCUMENTS
     let folderId;
     try {
-      console.log("📁 Creating folder in Drive...");
-      const folderRes = await createFolderInDrive(candidateId);
-      if (!folderRes.success) {
-        console.error("❌ Drive folder creation failed:", folderRes.error);
-        return res.status(500).json({ error: "Drive folder creation failed", details: folderRes.error });
-      }
-      folderId = folderRes.folderId;
+      console.log("📁 Creating candidate folder in ATS_DOCUMENTS...");
+      folderId = await createCandidateFolder(candidateId);
       console.log("✅ Folder created:", folderId);
     } catch (driveError) {
       console.error("❌ Error creating Drive folder:", driveError);
       return res.status(500).json({ error: "Drive folder creation failed", details: driveError.message });
     }
 
-    // Upload resumes
+    // Upload resumes to Drive
+    let uploadedFiles;
     try {
       console.log("📤 Uploading resumes to Drive folder...");
-      const uploadedFiles = await Promise.all(
+      uploadedFiles = await Promise.all(
         resumeFiles.map(file => uploadToDrive(file.originalname, file.buffer, file.mimetype, folderId))
       );
       console.log("✅ All resumes uploaded:", uploadedFiles.map(f => f.webViewLink));
@@ -112,7 +108,7 @@ export const uploadCandidateWithResume = async (req, res) => {
       return res.status(500).json({ error: "Resume upload failed", details: uploadError.message });
     }
 
-    // Save candidate
+    // Save candidate in DB
     try {
       console.log("💾 Saving candidate to database...");
       const newCandidate = new Candidate({
@@ -131,7 +127,9 @@ export const uploadCandidateWithResume = async (req, res) => {
         LinkedinUrl: req.body.linkedinUrl,
         clientdetails: req.body.clientDetails,
         role: req.body.role,
-        resumeUrls: [`https://drive.google.com/drive/folders/${folderId}`],
+        // Store both folder link & file links
+        resumeUrls: uploadedFiles.map(f => f.webViewLink),
+        folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
         folderId,
         addedBy: req.user?.email,
         sourceRole: req.user?.role || "recruiter",
@@ -152,7 +150,13 @@ export const uploadCandidateWithResume = async (req, res) => {
       return res.status(500).json({ error: "Failed to save candidate", details: dbError.message });
     }
 
-    res.status(201).json({ message: "Candidate uploaded successfully", candidateId, folderId });
+    res.status(201).json({
+      message: "Candidate uploaded successfully",
+      candidateId,
+      folderId,
+      folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
+      fileLinks: uploadedFiles.map(f => f.webViewLink),
+    });
   } catch (error) {
     console.error("❌ Unexpected error:", error);
     res.status(500).json({ error: "Unexpected error occurred", details: error.message });
