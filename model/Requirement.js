@@ -97,6 +97,11 @@ const requirementSchema = new mongoose.Schema({
     enum: ["USC", "GC", "H1B", "OPT", "Other"],
     default: [],
   },
+  duration: {
+    type: String,
+    enum: ["longterm", "shortterm"],
+    default: "longterm"
+  },
 
 
   createdAt: {
