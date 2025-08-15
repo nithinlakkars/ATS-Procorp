@@ -100,7 +100,7 @@ const requirementSchema = new mongoose.Schema({
   duration: {
     type: String,
     enum: ["longterm", "shortterm"],
-    default: "longterm"
+    required: true
   },
 
 
