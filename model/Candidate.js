@@ -30,7 +30,7 @@ const candidateSchema = new mongoose.Schema(
     currentLocation: String,
     relocation: {
       type: String,
-      enum: ["Yes", "No", "yes"],
+      enum: ["Yes", "No", "yes", "no"],
     },
     passportnumber: String,
     Last4digitsofSSN: String,
