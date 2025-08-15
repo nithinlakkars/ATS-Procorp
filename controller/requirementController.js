@@ -17,6 +17,7 @@ export const submitRequirement = async (req, res) => {
     priority,
     client,
     workAuthorization,
+    duration,
     requirementStatus = "open", // ✅ New field default to "open"
   } = req.body;
 
@@ -49,6 +50,7 @@ export const submitRequirement = async (req, res) => {
       priority: priority || "Medium",
       client,
       workAuthorization,
+      duration,
       requirementStatus, // ✅ Added here
     });
 
