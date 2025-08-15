@@ -4,6 +4,7 @@ import { sendEmail } from "../utils/emailSender.js";
 
 // 🎯 Submit requirement with custom ID
 export const submitRequirement = async (req, res) => {
+  console.log("REQ.BODY DURATION:", req.body.duration);
   const {
     title,
     description,
