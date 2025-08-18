@@ -137,8 +137,8 @@ export const uploadCandidateWithResume = async (req, res) => {
         workAuthorization: Array.isArray(req.body.workAuthorization)
           ? req.body.workAuthorization
           : typeof req.body.workAuthorization === "string"
-          ? [req.body.workAuthorization]
-          : [],
+            ? [req.body.workAuthorization]
+            : [],
         candidate_update: "submitted",
         status: "submitted",
       });
@@ -265,8 +265,10 @@ export const getSalesCandidates = async (req, res) => {
       $or: [
         { createdBy: salesEmail },
         { recruiterAssignedBy: salesEmail },
+        { leadAssignedTo: salesEmail }, // add this if needed
       ],
     });
+
 
     const requirementIds = requirements.map(r => r.requirementId);
     console.log("Requirement IDs to fetch candidates:", requirementIds);
