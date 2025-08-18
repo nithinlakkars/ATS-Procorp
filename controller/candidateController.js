@@ -168,41 +168,51 @@ export const uploadCandidateWithResume = async (req, res) => {
 // ✅ Get candidates for lead
 export const getLeadsCandidates = async (req, res) => {
   try {
-    const leadEmail = req.user.email.toLowerCase(); // 👈 from JWT/session
+    // 1️⃣ Check logged-in user
+    console.log("Logged-in user info:", req.user);
+    if (!req.user || !req.user.email) {
+      return res.status(400).json({ message: "❌ User not logged in or email missing" });
+    }
 
-    // Step 1: Find requirements assigned to this lead
-    const requirements = await Requirement.find({
-      leadAssignedTo: leadEmail,
-    });
+    const leadEmail = req.user.email.toLowerCase(); // normalize
+    console.log("Lead email:", leadEmail);
+
+    // 2️⃣ Fetch requirements assigned to this lead
+    const requirements = await Requirement.find({ leadAssignedTo: leadEmail });
+    console.log("Requirements fetched for lead:", requirements);
 
     const requirementIds = requirements.map(r => r.requirementId);
+    console.log("Requirement IDs to fetch candidates:", requirementIds);
 
-    // Step 2: Fetch candidates only for those requirements
+    // If no requirements found, return early
+    if (!requirementIds.length) {
+      return res.status(200).json({ message: "No requirements assigned to this lead", candidates: [], status: true });
+    }
+
+    // 3️⃣ Fetch candidates for these requirements
     const candidates = await Candidate.find({
       $and: [
         { requirementId: { $in: requirementIds } },
         { status: { $in: ["submitted", "forwarded-to-sales", "new"] } },
-        {
-          $or: [
-            { isDeleted: false },
-            { isDeleted: { $exists: false } },
-          ],
-        },
+        { $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }] },
       ],
     });
+    console.log("Candidates fetched:", candidates);
 
-    // Step 3: Map requirementId -> title
+    // 4️⃣ Map requirementId -> title
     const reqMap = {};
     requirements.forEach(r => {
       reqMap[r.requirementId] = r.title || r.requirementId;
     });
 
-    // Step 4: Enrich candidates with requirement titles
+    // 5️⃣ Enrich candidates with requirement titles
     const enrichedCandidates = candidates.map(c => {
       const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
       return { ...c.toObject(), requirementTitles: titles };
     });
+
+    console.log("Enriched candidates:", enrichedCandidates);
 
     res.status(200).json({
       message: "✅ Fetched candidates for this lead",
@@ -214,6 +224,7 @@ export const getLeadsCandidates = async (req, res) => {
     res.status(500).json({ error: "❌ Failed to fetch leads candidates" });
   }
 };
+
 
 
 
@@ -249,28 +260,41 @@ export const forwardCandidateToSales = async (req, res) => {
 // ✅ Get sales candidates
 export const getSalesCandidates = async (req, res) => {
   try {
-    const salesEmail = req.user.email.toLowerCase(); // 👈 logged-in sales user
+    // 1️⃣ Check logged-in user
+    console.log("Logged-in sales user info:", req.user);
+    if (!req.user || !req.user.email) {
+      return res.status(400).json({ message: "❌ User not logged in or email missing" });
+    }
 
-    // Step 1: Find requirements created by this sales user
-    const requirements = await Requirement.find({
-      createdBy: salesEmail,
-    });
+    const salesEmail = req.user.email.toLowerCase(); // normalize
+    console.log("Sales email:", salesEmail);
+
+    // 2️⃣ Fetch requirements created by this sales user
+    const requirements = await Requirement.find({ createdBy: salesEmail });
+    console.log("Requirements fetched for sales:", requirements);
 
     const requirementIds = requirements.map(r => r.requirementId);
+    console.log("Requirement IDs to fetch candidates:", requirementIds);
 
-    // Step 2: Fetch candidates only for those requirements
+    // If no requirements found, return early
+    if (!requirementIds.length) {
+      return res.status(200).json({ message: "No requirements created by this sales user", candidates: [], status: true });
+    }
+
+    // 3️⃣ Fetch candidates for these requirements
     const candidates = await Candidate.find({
       status: "forwarded-to-sales",
       requirementId: { $in: requirementIds },
     }).select("+isActive");
+    console.log("Candidates fetched:", candidates);
 
-    // Step 3: Map requirementId -> title
+    // 4️⃣ Map requirementId -> title
     const reqMap = {};
     requirements.forEach(req => {
       reqMap[req.requirementId] = req.title || req.requirementId;
     });
 
-    // Step 4: Attach requirement titles to each candidate
+    // 5️⃣ Attach requirement titles to candidates
     const enrichedCandidates = candidates.map(candidate => {
       const ids = Array.isArray(candidate.requirementId) ? candidate.requirementId : [candidate.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
@@ -279,6 +303,8 @@ export const getSalesCandidates = async (req, res) => {
         requirementTitles: titles,
       };
     });
+
+    console.log("Enriched candidates:", enrichedCandidates);
 
     res.status(200).json({
       message: "✅ Sales candidates fetched",
