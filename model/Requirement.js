@@ -27,7 +27,8 @@ const requirementSchema = new mongoose.Schema({
   },
   leadAssignedTo: {
     type: [String], // Lead email(s)
-    required: true,
+    required: false,
+    default: [],
     set: (emails) => emails.map((e) => e.toLowerCase().trim()),
   },
   leadAssignedBy: {
