@@ -29,6 +29,8 @@ app.use(cors(corsOptions));
 
 const PORT = process.env.PORT || 5000;
 
+
+app.get("/test", (req, res) => res.json({ message: "Backend running" }));
 app.use("/api/stats", statsRoutes);
 app.use("/api", router);
 app.use("/uploads", express.static("uploads")); // resume static files
