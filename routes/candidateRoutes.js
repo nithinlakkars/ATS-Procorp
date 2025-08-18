@@ -25,7 +25,7 @@ candidateRoutes.post(
 candidateRoutes.post(
   "/recruiter/upload",
   authorizeRole(["recruiter"]),
-  upload.array("resume", 5), // keeps your array upload
+  upload.array("resume", 10), // keeps your array upload
   async (req, res, next) => {
     try {
       console.log("Request body:", req.body);
