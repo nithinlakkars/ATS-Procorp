@@ -168,28 +168,29 @@ export const uploadCandidateWithResume = async (req, res) => {
 // ✅ Get candidates for lead
 export const getLeadsCandidates = async (req, res) => {
   try {
-    // 1️⃣ Check logged-in user
-    console.log("Logged-in user info:", req.user);
-    if (!req.user || !req.user.email) {
-      return res.status(400).json({ message: "❌ User not logged in or email missing" });
-    }
+    const leadEmail = req.user.email.toLowerCase(); // logged-in lead
 
-    const leadEmail = req.user.email.toLowerCase(); // normalize
-    console.log("Lead email:", leadEmail);
-
-    // 2️⃣ Fetch requirements assigned to this lead
-    const requirements = await Requirement.find({ leadAssignedTo: leadEmail });
-    console.log("Requirements fetched for lead:", requirements);
+    // Step 1: Find requirements relevant to this lead
+    const requirements = await Requirement.find({
+      $or: [
+        { leadAssignedTo: leadEmail },
+        { createdBy: leadEmail },
+        { recruiterAssignedBy: leadEmail },
+      ],
+    });
 
     const requirementIds = requirements.map(r => r.requirementId);
     console.log("Requirement IDs to fetch candidates:", requirementIds);
 
-    // If no requirements found, return early
     if (!requirementIds.length) {
-      return res.status(200).json({ message: "No requirements assigned to this lead", candidates: [], status: true });
+      return res.status(200).json({
+        message: "No requirements found for this lead",
+        candidates: [],
+        status: true,
+      });
     }
 
-    // 3️⃣ Fetch candidates for these requirements
+    // Step 2: Fetch candidates for these requirements
     const candidates = await Candidate.find({
       $and: [
         { requirementId: { $in: requirementIds } },
@@ -197,22 +198,19 @@ export const getLeadsCandidates = async (req, res) => {
         { $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }] },
       ],
     });
-    console.log("Candidates fetched:", candidates);
 
-    // 4️⃣ Map requirementId -> title
+    // Step 3: Map requirementId -> title
     const reqMap = {};
     requirements.forEach(r => {
       reqMap[r.requirementId] = r.title || r.requirementId;
     });
 
-    // 5️⃣ Enrich candidates with requirement titles
+    // Step 4: Enrich candidates with requirement titles
     const enrichedCandidates = candidates.map(c => {
       const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
       return { ...c.toObject(), requirementTitles: titles };
     });
-
-    console.log("Enriched candidates:", enrichedCandidates);
 
     res.status(200).json({
       message: "✅ Fetched candidates for this lead",
