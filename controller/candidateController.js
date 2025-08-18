@@ -258,41 +258,40 @@ export const forwardCandidateToSales = async (req, res) => {
 // ✅ Get sales candidates
 export const getSalesCandidates = async (req, res) => {
   try {
-    // 1️⃣ Check logged-in user
-    console.log("Logged-in sales user info:", req.user);
-    if (!req.user || !req.user.email) {
-      return res.status(400).json({ message: "❌ User not logged in or email missing" });
-    }
+    const salesEmail = req.user.email.toLowerCase(); // logged-in sales user
 
-    const salesEmail = req.user.email.toLowerCase(); // normalize
-    console.log("Sales email:", salesEmail);
-
-    // 2️⃣ Fetch requirements created by this sales user
-    const requirements = await Requirement.find({ createdBy: salesEmail });
-    console.log("Requirements fetched for sales:", requirements);
+    // Step 1: Find requirements relevant to this sales user
+    const requirements = await Requirement.find({
+      $or: [
+        { createdBy: salesEmail },
+        { recruiterAssignedBy: salesEmail },
+      ],
+    });
 
     const requirementIds = requirements.map(r => r.requirementId);
     console.log("Requirement IDs to fetch candidates:", requirementIds);
 
-    // If no requirements found, return early
     if (!requirementIds.length) {
-      return res.status(200).json({ message: "No requirements created by this sales user", candidates: [], status: true });
+      return res.status(200).json({
+        message: "No requirements found for this sales user",
+        candidates: [],
+        status: true,
+      });
     }
 
-    // 3️⃣ Fetch candidates for these requirements
+    // Step 2: Fetch candidates for these requirements
     const candidates = await Candidate.find({
       status: "forwarded-to-sales",
       requirementId: { $in: requirementIds },
     }).select("+isActive");
-    console.log("Candidates fetched:", candidates);
 
-    // 4️⃣ Map requirementId -> title
+    // Step 3: Map requirementId -> title
     const reqMap = {};
     requirements.forEach(req => {
       reqMap[req.requirementId] = req.title || req.requirementId;
     });
 
-    // 5️⃣ Attach requirement titles to candidates
+    // Step 4: Attach requirement titles to candidates
     const enrichedCandidates = candidates.map(candidate => {
       const ids = Array.isArray(candidate.requirementId) ? candidate.requirementId : [candidate.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
@@ -301,8 +300,6 @@ export const getSalesCandidates = async (req, res) => {
         requirementTitles: titles,
       };
     });
-
-    console.log("Enriched candidates:", enrichedCandidates);
 
     res.status(200).json({
       message: "✅ Sales candidates fetched",
@@ -314,6 +311,7 @@ export const getSalesCandidates = async (req, res) => {
     res.status(500).json({ error: "❌ Failed to fetch sales candidates" });
   }
 };
+
 
 
 
