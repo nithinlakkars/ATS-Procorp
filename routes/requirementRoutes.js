@@ -92,7 +92,7 @@ requirementRouter.get(
   authorizeRole(["lead"]),
   authenticatedLeadRequirements
 );
-router.get("/requirements/leads/my", authMiddleware, getMyLeadRequirements);
+requirementRouter.get("/requirements/leads/my", authMiddleware, getMyLeadRequirements);
 
 // ------------------- RECRUITER -------------------
 requirementRouter.get(
