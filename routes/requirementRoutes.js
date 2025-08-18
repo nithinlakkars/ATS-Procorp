@@ -10,6 +10,7 @@ import {
   viewAllRequirements,
   viewUnassignedLeads,
   recruiterViewRequirements,
+  getMyLeadRequirements,
   authenticatedLeadRequirements,
   updateRequirementStatus,
 } from "../controller/requirementController.js";
@@ -91,6 +92,7 @@ requirementRouter.get(
   authorizeRole(["lead"]),
   authenticatedLeadRequirements
 );
+router.get("/requirements/leads/my", authMiddleware, getMyLeadRequirements);
 
 // ------------------- RECRUITER -------------------
 requirementRouter.get(
