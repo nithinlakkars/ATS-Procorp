@@ -250,35 +250,40 @@ export const forwardCandidateToSales = async (req, res) => {
 // ✅ Get sales candidates
 export const getSalesCandidates = async (req, res) => {
   try {
-    const candidates = await Candidate.find({ status: "forwarded-to-sales" })
-      .select("+isActive");
+    const salesEmail = req.user.email.toLowerCase(); // 👈 logged-in sales user
 
-    // Extract unique requirement IDs from candidates
-    const reqIdSet = new Set();
-    candidates.forEach(c => {
-      const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
-      ids.forEach(id => reqIdSet.add(id));
-    });
-
-    // Find matching Requirements
+    // Step 1: Find requirements assigned to this sales user
     const requirements = await Requirement.find({
-      requirementId: { $in: Array.from(reqIdSet) },
+      salesAssignedTo: salesEmail,   // 👈 must exist in Requirement schema
     });
 
-    // Create a mapping of requirementId -> title
+    const requirementIds = requirements.map(r => r.requirementId);
+
+    // Step 2: Fetch candidates only for those requirements
+    const candidates = await Candidate.find({
+      $and: [
+        { requirementId: { $in: requirementIds } },
+        { status: "forwarded-to-sales" },  // 👈 only forwarded ones
+        {
+          $or: [
+            { isDeleted: false },
+            { isDeleted: { $exists: false } },
+          ],
+        },
+      ],
+    }).select("+isActive");
+
+    // Step 3: Map requirementId -> title
     const reqMap = {};
-    requirements.forEach(req => {
-      reqMap[req.requirementId] = req.title || req.requirementId;
+    requirements.forEach(r => {
+      reqMap[r.requirementId] = r.title || r.requirementId;
     });
 
-    // Attach requirement titles to each candidate
-    const enrichedCandidates = candidates.map(candidate => {
-      const ids = Array.isArray(candidate.requirementId) ? candidate.requirementId : [candidate.requirementId];
+    // Step 4: Enrich candidates with requirement titles
+    const enrichedCandidates = candidates.map(c => {
+      const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
-      return {
-        ...candidate.toObject(),
-        requirementTitles: titles,
-      };
+      return { ...c.toObject(), requirementTitles: titles };
     });
 
     res.status(200).json({
@@ -291,6 +296,7 @@ export const getSalesCandidates = async (req, res) => {
     res.status(500).json({ error: "❌ Failed to fetch sales candidates" });
   }
 };
+
 
 
 
