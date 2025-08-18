@@ -282,10 +282,12 @@ export const getSalesCandidates = async (req, res) => {
     }
 
     // Step 2: Fetch candidates for these requirements
+    // Step 2: Fetch candidates for these requirements (without status filter)
     const candidates = await Candidate.find({
-      status: "forwarded-to-sales",
       requirementId: { $in: requirementIds },
     }).select("+isActive");
+    console.log("Fetched candidates:", candidates.map(c => c.candidateId));
+
 
     // Step 3: Map requirementId -> title
     const reqMap = {};
