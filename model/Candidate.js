@@ -79,6 +79,21 @@ const candidateSchema = new mongoose.Schema(
       enum: ["L1-cleared", "selected", "rejected", "Waiting-for-update", "To-be-interviewed", "Decision-pending", "submitted","internal-rejection","submitted-to-client"],
 
     },
+lead_update: {
+  type: String,
+  enum: [
+    "",
+    "L1-cleared",
+    "selected",
+    "rejected",
+    "Waiting-for-update",
+    "To-be-interviewed",
+    "Decision-pending",
+    "internal-rejection",
+    "submitted-to-client"
+  ],
+  default: ""
+},
 
 
 
