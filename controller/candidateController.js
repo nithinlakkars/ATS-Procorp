@@ -258,39 +258,28 @@ export const forwardCandidateToSales = async (req, res) => {
 // ✅ Get sales candidates
 export const getSalesCandidates = async (req, res) => {
   try {
-    const adminEmail = req.user.email.toLowerCase(); // logged-in sales user
+    const candidates = await Candidate.find({ status: "forwarded-to-sales" })
+      .select("+isActive");
 
-    // Step 1: Find requirements created or assigned by this sales user
-    const requirements = await Requirement.find({
-      $or: [
-        { createdBy: adminEmail },
-        { recruiterAssignedBy: adminEmail },
-      ],
+    // Extract unique requirement IDs from candidates
+    const reqIdSet = new Set();
+    candidates.forEach(c => {
+      const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
+      ids.forEach(id => reqIdSet.add(id));
     });
 
-    const requirementIds = requirements.map(r => r.requirementId);
+    // Find matching Requirements
+    const requirements = await Requirement.find({
+      requirementId: { $in: Array.from(reqIdSet) },
+    });
 
-    if (!requirementIds.length) {
-      return res.status(200).json({
-        message: "No requirements found for this sales user",
-        candidates: [],
-        status: true,
-      });
-    }
-
-    // Step 2: Fetch candidates for only these requirements
-    const candidates = await Candidate.find({
-      status: "forwarded-to-sales",
-      requirementId: { $in: requirementIds },
-    }).select("+isActive");
-
-    // Step 3: Map requirementId -> title
+    // Create a mapping of requirementId -> title
     const reqMap = {};
     requirements.forEach(req => {
       reqMap[req.requirementId] = req.title || req.requirementId;
     });
 
-    // Step 4: Attach requirement titles to candidates
+    // Attach requirement titles to each candidate
     const enrichedCandidates = candidates.map(candidate => {
       const ids = Array.isArray(candidate.requirementId) ? candidate.requirementId : [candidate.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
@@ -310,7 +299,6 @@ export const getSalesCandidates = async (req, res) => {
     res.status(500).json({ error: "❌ Failed to fetch sales candidates" });
   }
 };
-
 
 
 
