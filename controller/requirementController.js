@@ -101,6 +101,9 @@ export const viewSalesRequirements = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch requirements" });
   }
 };
+// 🎯 All requirements submitted by a Lead
+
+
 export const recruiterViewRequirements = async (req, res) => {
   try {
     const email = req.query.email?.toLowerCase();
@@ -214,6 +217,17 @@ export const unassignedRequirements = async (req, res) => {
   }
 };
 
+// 🎯 Get requirements submitted by the logged-in Lead
+export const getMyLeadRequirements = async (req, res) => {
+  try {
+    const leadEmail = req.user.email; // comes from token
+    const requirements = await Requirement.find({ createdBy: leadEmail });
+    res.status(200).json(requirements);
+  } catch (error) {
+    console.error("❌ Error fetching lead requirements:", error);
+    res.status(500).json({ message: "Server error while fetching lead requirements" });
+  }
+};
 
 
 
