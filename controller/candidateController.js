@@ -168,8 +168,19 @@ export const uploadCandidateWithResume = async (req, res) => {
 // ✅ Get candidates for lead
 export const getLeadsCandidates = async (req, res) => {
   try {
+    const leadEmail = req.user.email.toLowerCase(); // 👈 from JWT/session
+
+    // Step 1: Find requirements assigned to this lead
+    const requirements = await Requirement.find({
+      leadAssignedTo: leadEmail,
+    });
+
+    const requirementIds = requirements.map(r => r.requirementId);
+
+    // Step 2: Fetch candidates only for those requirements
     const candidates = await Candidate.find({
       $and: [
+        { requirementId: { $in: requirementIds } },
         { status: { $in: ["submitted", "forwarded-to-sales", "new"] } },
         {
           $or: [
@@ -180,25 +191,13 @@ export const getLeadsCandidates = async (req, res) => {
       ],
     });
 
-    // Collect all unique requirementIds
-    const reqIds = new Set();
-    candidates.forEach(c => {
-      const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
-      ids.forEach(id => reqIds.add(id));
-    });
-
-    // Fetch matching requirements
-    const requirements = await Requirement.find({
-      requirementId: { $in: Array.from(reqIds) },
-    });
-
-    // Map requirementId to title
+    // Step 3: Map requirementId -> title
     const reqMap = {};
     requirements.forEach(r => {
       reqMap[r.requirementId] = r.title || r.requirementId;
     });
 
-    // Enrich candidates with requirement titles
+    // Step 4: Enrich candidates with requirement titles
     const enrichedCandidates = candidates.map(c => {
       const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
@@ -206,7 +205,7 @@ export const getLeadsCandidates = async (req, res) => {
     });
 
     res.status(200).json({
-      message: "✅ Fetched candidates",
+      message: "✅ Fetched candidates for this lead",
       candidates: enrichedCandidates,
       status: true,
     });
@@ -215,6 +214,7 @@ export const getLeadsCandidates = async (req, res) => {
     res.status(500).json({ error: "❌ Failed to fetch leads candidates" });
   }
 };
+
 
 
 
