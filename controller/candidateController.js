@@ -217,7 +217,6 @@ export const getLeadsCandidates = async (req, res) => {
 
 
 
-
 // ✅ Forward candidate to sales
 export const forwardCandidateToSales = async (req, res) => {
   try {
@@ -252,38 +251,33 @@ export const getSalesCandidates = async (req, res) => {
   try {
     const salesEmail = req.user.email.toLowerCase(); // 👈 logged-in sales user
 
-    // Step 1: Find requirements assigned to this sales user
+    // Step 1: Find requirements created by this sales user
     const requirements = await Requirement.find({
-      salesAssignedTo: salesEmail,   // 👈 must exist in Requirement schema
+      createdBy: salesEmail,
     });
 
     const requirementIds = requirements.map(r => r.requirementId);
 
     // Step 2: Fetch candidates only for those requirements
     const candidates = await Candidate.find({
-      $and: [
-        { requirementId: { $in: requirementIds } },
-        { status: "forwarded-to-sales" },  // 👈 only forwarded ones
-        {
-          $or: [
-            { isDeleted: false },
-            { isDeleted: { $exists: false } },
-          ],
-        },
-      ],
+      status: "forwarded-to-sales",
+      requirementId: { $in: requirementIds },
     }).select("+isActive");
 
     // Step 3: Map requirementId -> title
     const reqMap = {};
-    requirements.forEach(r => {
-      reqMap[r.requirementId] = r.title || r.requirementId;
+    requirements.forEach(req => {
+      reqMap[req.requirementId] = req.title || req.requirementId;
     });
 
-    // Step 4: Enrich candidates with requirement titles
-    const enrichedCandidates = candidates.map(c => {
-      const ids = Array.isArray(c.requirementId) ? c.requirementId : [c.requirementId];
+    // Step 4: Attach requirement titles to each candidate
+    const enrichedCandidates = candidates.map(candidate => {
+      const ids = Array.isArray(candidate.requirementId) ? candidate.requirementId : [candidate.requirementId];
       const titles = ids.map(id => reqMap[id] || id);
-      return { ...c.toObject(), requirementTitles: titles };
+      return {
+        ...candidate.toObject(),
+        requirementTitles: titles,
+      };
     });
 
     res.status(200).json({
