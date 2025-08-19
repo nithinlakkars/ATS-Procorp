@@ -372,7 +372,7 @@ export const getRecruiterCandidates = async (req, res) => {
 // Optional: Unified update controller
 export const updateCandidateFields = async (req, res) => {
   try {
-    const { candidateId, isActive, candidate_update } = req.body;
+    const { candidateId, isActive, candidate_update, lead_update } = req.body;
 
     // ✅ Step 1: Validate input
     if (!candidateId) {
@@ -388,6 +388,10 @@ export const updateCandidateFields = async (req, res) => {
 
     if (typeof candidate_update === "string" && candidate_update.trim() !== "") {
       updateFields.candidate_update = candidate_update;
+    }
+
+    if (typeof lead_update === "string" && lead_update.trim() !== "") {
+      updateFields.lead_update = lead_update;
     }
 
     // ⚠️ Optional: Return error if no fields to update
@@ -416,6 +420,7 @@ export const updateCandidateFields = async (req, res) => {
     return res.status(500).json({ error: "❌ Failed to update candidate fields" });
   }
 };
+
 
 // Route: POST /api/test/create-drive-folder
 export const testCreateDriveFolder = async (req, res) => {
