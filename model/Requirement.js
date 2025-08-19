@@ -95,7 +95,7 @@ const requirementSchema = new mongoose.Schema({
 
   workAuthorization: {
     type: [String],
-    enum: ["USC", "GC", "H1B", "OPT", "Other"],
+    enum: ["USC", "GC","GC-EAD", "H1B","H4-EAD","TN","L2-EAD","OPT", "Other"],
     default: [],
   },
   duration: {
