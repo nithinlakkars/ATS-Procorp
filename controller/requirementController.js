@@ -218,29 +218,42 @@ export const unassignedRequirements = async (req, res) => {
 };
 
 // 🎯 Get requirements submitted by the logged-in Lead
-export const getMyLeadRequirements = async (req, res) => {
+// Get all requirements relevant to logged-in lead
+// ------------------- Lead: Get all lead requirements -------------------
+export const getAllLeadRequirements = async (req, res) => {
   try {
-    const leadEmail = req.user.email; // comes from token
-    const requirements = await Requirement.find({ createdBy: leadEmail });
-    res.status(200).json(requirements);
+    const userEmail = req.user?.email; // coming from authMiddleware
+
+    // Fetch all requirements assigned to this lead
+    const assignedRequirements = await Requirement.find({
+      recruiterAssignedTo: userEmail,
+    }).lean();
+
+    // Fetch all requirements created by this lead
+    const createdRequirements = await Requirement.find({
+      createdBy: userEmail,
+    }).lean();
+
+    // Merge both arrays (optional: remove duplicates if needed)
+   // Merge assigned & created, remove duplicates, and add "type" field
+const allRequirements = [
+  ...assignedRequirements,
+  ...createdRequirements.filter(
+    cr => !assignedRequirements.some(ar => ar._id.toString() === cr._id.toString())
+  ),
+].map(req => ({
+  ...req,
+  type: assignedRequirements.some(ar => ar._id.toString() === req._id.toString()) ? "assigned" : "created"
+}));
+
+
+    res.status(200).json(allRequirements);
   } catch (error) {
     console.error("❌ Error fetching lead requirements:", error);
-    res.status(500).json({ message: "Server error while fetching lead requirements" });
+    res.status(500).json({ message: "Failed to fetch lead requirements" });
   }
 };
 
-
-
-
-export const myLeadRequirements = async (req, res) => {
-  try {
-    const email = req.user.email;
-    const reqs = await Requirement.find({ leadAssignedTo: email });
-    res.json(reqs);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to load your requirements" });
-  }
-};
 
 export const assignRequirement = async (req, res) => {
   const { recruiterEmails, leadEmail } = req.body;
@@ -321,16 +334,7 @@ export const viewUnassignedLeads = async (req, res) => {
   }
 };
 
-export const authenticatedLeadRequirements = async (req, res) => {
-  try {
-    const requirements = await Requirement.find({
-      leadAssignedTo: req.user.email,
-    });
-    res.json(requirements);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch requirements" });
-  }
-};
+
 export const updateRequirementStatus = async (req, res) => {
   try {
     const { requirementId, requirementStatus } = req.body;

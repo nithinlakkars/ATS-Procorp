@@ -58,12 +58,6 @@ requirementRouter.put(
   assignMultipleRequirements
 );
 
-requirementRouter.get(
-  "/leads/my",
-  authenticateToken,
-  authorizeRole(["lead"]),
-  myLeadRequirements
-);
 
 requirementRouter.put(
   "/leads/assign/:reqId",
@@ -86,13 +80,13 @@ requirementRouter.get(
   viewUnassignedLeads
 );
 
+
 requirementRouter.get(
-  "/leads/view-auth",
-  authMiddleware,
-  authorizeRole(["lead"]),
-  authenticatedLeadRequirements
+  "/leads/all",
+  authMiddleware(["lead"]),
+  getAllLeadRequirements
 );
-requirementRouter.get("/requirements/leads/my", authMiddleware, getMyLeadRequirements);
+
 
 // ------------------- RECRUITER -------------------
 requirementRouter.get(
