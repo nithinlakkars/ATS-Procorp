@@ -11,6 +11,7 @@ import requirementRouter from "./routes/requirementRoutes.js";
 import statsRoutes from "./routes/stats.routes.js";
 import { testCreateDriveFolder } from "./controller/candidateController.js";
 // import driveAuthRoutes from "./routes/driveAuthRoutes.js";
+import uploadToDriveRouter from "./utils/uploadToDriveOAuth.js";
 
 
 // Load environment variables
@@ -49,6 +50,7 @@ app.use("/api/candidates", authenticateToken, candidateRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/requirements", requirementRouter);
 // app.use("/", driveAuthRoutes);
+app.use("/", uploadToDriveRouter);
 
 
 // --- Test route ---
