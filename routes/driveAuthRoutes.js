@@ -1,42 +1,51 @@
+// src/routes/driveAuthRoutes.js
 import express from "express";
-import fs from "fs";
 import { google } from "googleapis";
 
 const router = express.Router();
 
-// Load credentials
-const CREDENTIALS_PATH = "./config/client_secret.json";
-const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, "utf-8"));
-const { client_secret, client_id, redirect_uris } = credentials.web;
-const oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+// Load credentials from env or JSON
+const credentials = {
+  web: {
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SECRET,
+    redirect_uris: [process.env.GOOGLE_REDIRECT_URI],
+  },
+};
 
-const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
+const { client_id, client_secret, redirect_uris } = credentials.web;
+const oAuth2Client = new google.auth.OAuth2(
+  client_id,
+  client_secret,
+  redirect_uris[0]
+);
 
-// Step 1: Start OAuth flow
+const SCOPES = ["https://www.googleapis.com/auth/drive"];
+
+// Step 1: Auth URL
 router.get("/auth", (req, res) => {
-    const url = oAuth2Client.generateAuthUrl({
-        access_type: "offline",
-        scope: SCOPES,
-        prompt: "consent",
-    });
-    res.redirect(url);
+  const authUrl = oAuth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: SCOPES,
+    prompt: "consent",
+  });
+  res.redirect(authUrl);
 });
 
-// Step 2: OAuth callback
+// Step 2: Callback URL
 router.get("/oauth2callback", async (req, res) => {
-    const code = req.query.code;
-    if (!code) return res.send("❌ No code received");
+  const code = req.query.code;
+  if (!code) return res.status(400).send("❌ No code provided");
 
-    try {
-        const { tokens } = await oAuth2Client.getToken(code);
-        console.log("✅ Refresh token:", tokens.refresh_token);
-
-        // Send a simple message to browser
-        res.send("✅ Authorization complete! Check server logs for refresh token.");
-    } catch (err) {
-        console.error("❌ OAuth2 callback error:", err);
-        res.status(500).send("❌ Authorization failed");
-    }
+  try {
+    const { tokens } = await oAuth2Client.getToken(code);
+    oAuth2Client.setCredentials(tokens);
+    // Send JSON token back to user
+    res.json({ message: "✅ Tokens generated!", tokens });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("❌ Error retrieving tokens");
+  }
 });
 
 export default router;
