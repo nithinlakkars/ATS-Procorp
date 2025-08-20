@@ -4,14 +4,13 @@ import {
   submitRequirement,
   viewSalesRequirements,
   unassignedRequirements,
-  myLeadRequirements,
   assignRequirement,
   assignMultipleRequirements,
   viewAllRequirements,
   viewUnassignedLeads,
   recruiterViewRequirements,
-  authenticatedLeadRequirements,
   updateRequirementStatus,
+  getAllLeadRequirements,
 } from "../controller/requirementController.js";
 
 import authorizeRole from "../middleware/authorizeRole.js";
@@ -57,12 +56,6 @@ requirementRouter.put(
   assignMultipleRequirements
 );
 
-requirementRouter.get(
-  "/leads/my",
-  authenticateToken,
-  authorizeRole(["lead"]),
-  myLeadRequirements
-);
 
 requirementRouter.put(
   "/leads/assign/:reqId",
@@ -85,12 +78,13 @@ requirementRouter.get(
   viewUnassignedLeads
 );
 
+
 requirementRouter.get(
-  "/leads/view-auth",
-  authMiddleware,
-  authorizeRole(["lead"]),
-  authenticatedLeadRequirements
+  "/leads/all",
+  authMiddleware(["lead"]),
+  getAllLeadRequirements
 );
+
 
 // ------------------- RECRUITER -------------------
 requirementRouter.get(
