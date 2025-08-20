@@ -4,15 +4,13 @@ import {
   submitRequirement,
   viewSalesRequirements,
   unassignedRequirements,
-  myLeadRequirements,
   assignRequirement,
   assignMultipleRequirements,
   viewAllRequirements,
   viewUnassignedLeads,
   recruiterViewRequirements,
-  getMyLeadRequirements,
-  authenticatedLeadRequirements,
   updateRequirementStatus,
+  getAllLeadRequirements,
 } from "../controller/requirementController.js";
 
 import authorizeRole from "../middleware/authorizeRole.js";
