@@ -23,7 +23,7 @@ app.use(express.json());
 let corsOptions;
 if (process.env.NODE_ENV === "production") {
   corsOptions = {
-    origin: process.env.FRONTEND_URL || "https://procorp-ats-frontend.onrender.com",
+    origin: process.env.FRONTEND_URL || "https://procorp-frontend-ats.onrender.com",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
