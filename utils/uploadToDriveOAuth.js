@@ -104,7 +104,7 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
   bufferStream.end(fileBuffer);
 
   const fileMetadata = { name: filename, parents: [folderId] };
-  const media = { mimeType, body: bufferStream };
+  const media = { mimeType: mimetype, body: bufferStream }; // ✅ fix
 
   const response = await drive.files.create({
     requestBody: fileMetadata,
@@ -114,6 +114,7 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
 
   return response.data;
 };
+
 
 // --- Express Router for OAuth ---
 const router = express.Router();
