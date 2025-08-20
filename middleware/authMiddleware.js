@@ -6,13 +6,16 @@ export const authMiddleware = (roles = []) => {
   return async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
+        console.log("Auth Header:", authHeader);    
 
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({ error: "Unauthorized - No token" });
       }
 
       const token = authHeader.split(" ")[1];
+       console.log("Token:", token); 
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "yoursecret");
+      console.log("Decoded:", decoded);
 
       // 👇 Use email instead of userId
       const user = await User.findOne({ email: decoded.email });
