@@ -10,7 +10,7 @@ import testRoutes from "./routes/testRoutes.js";
 import requirementRouter from "./routes/requirementRoutes.js";
 import statsRoutes from "./routes/stats.routes.js";
 import { testCreateDriveFolder } from "./controller/candidateController.js";
-import driveAuthRoutes from "./routes/driveAuthRoutes.js";
+// import driveAuthRoutes from "./routes/driveAuthRoutes.js";
 
 
 // Load environment variables
@@ -48,7 +48,7 @@ app.post("/api/candidates/test/create-drive-folder", testCreateDriveFolder);
 app.use("/api/candidates", authenticateToken, candidateRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/requirements", requirementRouter);
-app.use("/", driveAuthRoutes);
+// app.use("/", driveAuthRoutes);
 
 
 // --- Test route ---
