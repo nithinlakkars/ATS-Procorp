@@ -1,34 +1,58 @@
 import { google } from "googleapis";
+import fs from "fs";
+import path from "path";
 import stream from "stream";
 
-// Load OAuth2 credentials from env
-const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON } = process.env;
+// --- Load credentials dynamically ---
+let oAuth2Client;
 
-if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI || !GOOGLE_TOKEN_JSON) {
-  throw new Error("❌ Missing required Google OAuth environment variables");
+const credentialsEnvVars = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_REDIRECT_URI",
+  "GOOGLE_TOKEN_JSON",
+];
+
+// Check if all env variables exist
+const hasAllEnvVars = credentialsEnvVars.every((v) => process.env[v]);
+
+if (hasAllEnvVars) {
+  // ✅ Use environment variables (production)
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON } = process.env;
+  const token = JSON.parse(GOOGLE_TOKEN_JSON);
+
+  oAuth2Client = new google.auth.OAuth2(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI
+  );
+  oAuth2Client.setCredentials(token);
+
+} else {
+  // ✅ Use local JSON files (development)
+  const credentialsPath = path.join(process.cwd(), "config", "client_secret.json");
+  const tokenPath = path.join(process.cwd(), "config", "token.json");
+
+  if (!fs.existsSync(credentialsPath) || !fs.existsSync(tokenPath)) {
+    throw new Error("❌ Missing local credentials for development");
+  }
+
+  const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
+  const token = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+
+  const { client_id, client_secret, redirect_uris } = credentials.installed || credentials.web;
+
+  oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  oAuth2Client.setCredentials(token);
 }
 
-const token = JSON.parse(GOOGLE_TOKEN_JSON);
-
-// Setup OAuth2 client
-const oAuth2Client = new google.auth.OAuth2(
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI
-);
-oAuth2Client.setCredentials(token);
-
-// Create Drive client
+// --- Google Drive client ---
 const drive = google.drive({ version: "v3", auth: oAuth2Client });
 
-/**
- * Get or create the ATS_DOCUMENTS main folder
- * @returns {Promise<string>} Folder ID
- */
+// --- Your existing functions ---
 export const getMainFolderId = async () => {
   const mainFolderName = "ATS_DOCUMENTS";
   try {
-    // 1️⃣ Search for existing ATS_DOCUMENTS folder
     const res = await drive.files.list({
       q: `name='${mainFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: "files(id, name)",
@@ -40,7 +64,6 @@ export const getMainFolderId = async () => {
       return res.data.files[0].id;
     }
 
-    // 2️⃣ Create it if not found
     const folder = await drive.files.create({
       requestBody: {
         name: mainFolderName,
@@ -57,20 +80,15 @@ export const getMainFolderId = async () => {
   }
 };
 
-/**
- * Create a candidate folder inside ATS_DOCUMENTS
- */
 export const createCandidateFolder = async (folderName) => {
   try {
-    const mainFolderId = await getMainFolderId(); // ensure main folder exists
-    const folderMetadata = {
-      name: folderName,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [mainFolderId], // ✅ Put inside ATS_DOCUMENTS
-    };
-
+    const mainFolderId = await getMainFolderId();
     const folder = await drive.files.create({
-      requestBody: folderMetadata,
+      requestBody: {
+        name: folderName,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [mainFolderId],
+      },
       fields: "id",
     });
 
@@ -82,9 +100,6 @@ export const createCandidateFolder = async (folderName) => {
   }
 };
 
-/**
- * Upload a file to a candidate folder
- */
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
   try {
     const bufferStream = new stream.PassThrough();
@@ -92,11 +107,11 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
 
     const fileMetadata = {
       name: filename,
-      parents: [folderId], // upload into candidate folder
+      parents: [folderId],
     };
 
     const media = {
-      mimeType: mimetype,
+      mimeType,
       body: bufferStream,
     };
 
@@ -113,3 +128,45 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
     throw error;
   }
 };
+import express from "express";
+import fs from "fs";
+import { google } from "googleapis";
+
+const router = express.Router();
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
+
+// 1️⃣ Start OAuth flow
+router.get("/api/auth/google", (req, res) => {
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: "offline", // allows refresh token
+    scope: ["https://www.googleapis.com/auth/drive.file"],
+    prompt: "consent", // forces Google to show the consent screen
+  });
+  res.redirect(authUrl);
+});
+
+// 2️⃣ Handle OAuth callback and save token
+router.get("/api/auth/google/callback", async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.status(400).send("No code received");
+
+  try {
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    // Save token to a file (or update your environment variable dynamically if needed)
+    fs.writeFileSync("token.json", JSON.stringify(tokens));
+
+    res.send("✅ Google Drive connected! Token generated successfully.");
+  } catch (err) {
+    console.error("❌ Error generating token:", err.message);
+    res.status(500).send("Error generating token");
+  }
+});
+
+export default router;
