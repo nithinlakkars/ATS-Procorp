@@ -2,55 +2,51 @@ import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
 import stream from "stream";
+import express from "express";
 
 // --- Load credentials dynamically ---
 let oAuth2Client;
 
-const credentialsEnvVars = [
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "GOOGLE_REDIRECT_URI",
-  "GOOGLE_TOKEN_JSON",
-];
+// Check if environment variable GOOGLE_CLIENT_SECRET_JSON exists
+if (process.env.GOOGLE_CLIENT_SECRET_JSON) {
+  // ✅ Production: Use environment variable
+  const credentials = JSON.parse(process.env.GOOGLE_CLIENT_SECRET_JSON);
+  const token = process.env.GOOGLE_TOKEN_JSON
+    ? JSON.parse(process.env.GOOGLE_TOKEN_JSON)
+    : null;
 
-// Check if all env variables exist
-const hasAllEnvVars = credentialsEnvVars.every((v) => process.env[v]);
+  const { client_id, client_secret, redirect_uris } = credentials.web || credentials.installed;
 
-if (hasAllEnvVars) {
-  // ✅ Use environment variables (production)
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_TOKEN_JSON } = process.env;
-  const token = JSON.parse(GOOGLE_TOKEN_JSON);
+  oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
 
-  oAuth2Client = new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI
-  );
-  oAuth2Client.setCredentials(token);
-
+  if (token) {
+    oAuth2Client.setCredentials(token);
+  }
 } else {
-  // ✅ Use local JSON files (development)
+  // ✅ Development: Use local JSON files
   const credentialsPath = path.join(process.cwd(), "config", "client_secret.json");
   const tokenPath = path.join(process.cwd(), "config", "token.json");
 
   if (!fs.existsSync(credentialsPath) || !fs.existsSync(tokenPath)) {
-    throw new Error("❌ Missing local credentials for development");
+    console.warn("⚠️  Missing local credentials. Running in dev mode without OAuth.");
+    oAuth2Client = null;
+  } else {
+    const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
+    const token = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+    const { client_id, client_secret, redirect_uris } = credentials.web || credentials.installed;
+
+    oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+    oAuth2Client.setCredentials(token);
   }
-
-  const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
-  const token = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
-
-  const { client_id, client_secret, redirect_uris } = credentials.installed || credentials.web;
-
-  oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-  oAuth2Client.setCredentials(token);
 }
 
 // --- Google Drive client ---
-const drive = google.drive({ version: "v3", auth: oAuth2Client });
+const drive = oAuth2Client ? google.drive({ version: "v3", auth: oAuth2Client }) : null;
 
-// --- Your existing functions ---
+// --- Helper functions ---
 export const getMainFolderId = async () => {
+  if (!drive) throw new Error("Google Drive client not initialized");
+
   const mainFolderName = "ATS_DOCUMENTS";
   try {
     const res = await drive.files.list({
@@ -59,112 +55,86 @@ export const getMainFolderId = async () => {
       spaces: "drive",
     });
 
-    if (res.data.files.length > 0) {
-      console.log(`📂 Main folder already exists: ${res.data.files[0].id}`);
-      return res.data.files[0].id;
-    }
+    if (res.data.files.length > 0) return res.data.files[0].id;
 
     const folder = await drive.files.create({
-      requestBody: {
-        name: mainFolderName,
-        mimeType: "application/vnd.google-apps.folder",
-      },
+      requestBody: { name: mainFolderName, mimeType: "application/vnd.google-apps.folder" },
       fields: "id",
     });
 
-    console.log(`✅ Created main folder: ${folder.data.id}`);
     return folder.data.id;
   } catch (error) {
-    console.error("❌ Error getting/creating main folder:", error.message);
+    console.error("Error getting/creating main folder:", error.message);
     throw error;
   }
 };
 
 export const createCandidateFolder = async (folderName) => {
-  try {
-    const mainFolderId = await getMainFolderId();
-    const folder = await drive.files.create({
-      requestBody: {
-        name: folderName,
-        mimeType: "application/vnd.google-apps.folder",
-        parents: [mainFolderId],
-      },
-      fields: "id",
-    });
+  if (!drive) throw new Error("Google Drive client not initialized");
 
-    console.log("✅ Created candidate folder:", folder.data.id);
-    return folder.data.id;
-  } catch (error) {
-    console.error("❌ Error creating candidate folder:", error.message);
-    throw error;
-  }
+  const mainFolderId = await getMainFolderId();
+  const folder = await drive.files.create({
+    requestBody: {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [mainFolderId],
+    },
+    fields: "id",
+  });
+
+  return folder.data.id;
 };
 
 export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) => {
-  try {
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileBuffer);
+  if (!drive) throw new Error("Google Drive client not initialized");
 
-    const fileMetadata = {
-      name: filename,
-      parents: [folderId],
-    };
+  const bufferStream = new stream.PassThrough();
+  bufferStream.end(fileBuffer);
 
-    const media = {
-      mimeType,
-      body: bufferStream,
-    };
+  const fileMetadata = { name: filename, parents: [folderId] };
+  const media = { mimeType, body: bufferStream };
 
-    const response = await drive.files.create({
-      requestBody: fileMetadata,
-      media,
-      fields: "id, name, webViewLink, webContentLink",
-    });
+  const response = await drive.files.create({
+    requestBody: fileMetadata,
+    media,
+    fields: "id, name, webViewLink, webContentLink",
+  });
 
-    console.log("✅ Uploaded file:", response.data.webViewLink);
-    return response.data;
-  } catch (error) {
-    console.error("❌ Error uploading file:", error.message);
-    throw error;
-  }
+  return response.data;
 };
 
-
+// --- Express Router for OAuth ---
 const router = express.Router();
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-// 1️⃣ Start OAuth flow
-router.get("/api/auth/google", (req, res) => {
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: "offline", // allows refresh token
-    scope: ["https://www.googleapis.com/auth/drive.file"],
-    prompt: "consent", // forces Google to show the consent screen
+if (oAuth2Client) {
+  router.get("/api/auth/google", (req, res) => {
+    const authUrl = oAuth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: ["https://www.googleapis.com/auth/drive.file"],
+      prompt: "consent",
+    });
+    res.redirect(authUrl);
   });
-  res.redirect(authUrl);
-});
 
-// 2️⃣ Handle OAuth callback and save token
-router.get("/api/auth/google/callback", async (req, res) => {
-  const code = req.query.code;
-  if (!code) return res.status(400).send("No code received");
+  router.get("/api/auth/google/callback", async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.status(400).send("No code received");
 
-  try {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    try {
+      const { tokens } = await oAuth2Client.getToken(code);
+      oAuth2Client.setCredentials(tokens);
 
-    // Save token to a file (or update your environment variable dynamically if needed)
-    fs.writeFileSync("token.json", JSON.stringify(tokens));
+      // Optionally save token locally for development
+      if (process.env.NODE_ENV !== "production") {
+        fs.writeFileSync(path.join(process.cwd(), "config", "token.json"), JSON.stringify(tokens));
+      }
 
-    res.send("✅ Google Drive connected! Token generated successfully.");
-  } catch (err) {
-    console.error("❌ Error generating token:", err.message);
-    res.status(500).send("Error generating token");
-  }
-});
+      res.send("✅ Google Drive connected! Token generated successfully.");
+    } catch (err) {
+      console.error("Error generating token:", err.message);
+      res.status(500).send("Error generating token");
+    }
+  });
+}
 
 export default router;
