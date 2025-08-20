@@ -15,9 +15,15 @@ if (process.env.GOOGLE_CLIENT_SECRET_JSON) {
     ? JSON.parse(process.env.GOOGLE_TOKEN_JSON)
     : null;
 
-  const { client_id, client_secret, redirect_uris } = credentials.web || credentials.installed;
+  const { client_id, client_secret } = credentials.web || credentials.installed;
 
-  oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  // Force correct redirect URI
+  const redirectUri =
+    process.env.NODE_ENV === "production"
+      ? "https://ats-procorp-backend.onrender.com/api/auth/google/callback"
+      : "http://localhost:5000/api/auth/google/callback";
+
+  oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
   if (token) {
     oAuth2Client.setCredentials(token);
@@ -27,16 +33,22 @@ if (process.env.GOOGLE_CLIENT_SECRET_JSON) {
   const credentialsPath = path.join(process.cwd(), "config", "client_secret.json");
   const tokenPath = path.join(process.cwd(), "config", "token.json");
 
-  if (!fs.existsSync(credentialsPath) || !fs.existsSync(tokenPath)) {
-    console.warn("⚠️  Missing local credentials. Running in dev mode without OAuth.");
+  if (!fs.existsSync(credentialsPath)) {
+    console.warn("⚠️  Missing client_secret.json. Running without OAuth.");
     oAuth2Client = null;
   } else {
     const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
-    const token = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
-    const { client_id, client_secret, redirect_uris } = credentials.web || credentials.installed;
+    const { client_id, client_secret, redirect_uris } =
+      credentials.web || credentials.installed;
 
-    oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    oAuth2Client.setCredentials(token);
+    // Use localhost redirect for dev
+    const redirectUri = "http://localhost:5000/api/auth/google/callback";
+    oAuth2Client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
+
+    if (fs.existsSync(tokenPath)) {
+      const token = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+      oAuth2Client.setCredentials(token);
+    }
   }
 }
 
@@ -107,15 +119,17 @@ export const uploadToDrive = async (filename, fileBuffer, mimetype, folderId) =>
 const router = express.Router();
 
 if (oAuth2Client) {
+  // Step 1: Start OAuth
   router.get("/api/auth/google", (req, res) => {
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: "offline",
       scope: ["https://www.googleapis.com/auth/drive.file"],
-      prompt: "consent",
+      prompt: "consent", // ensures refresh_token is returned
     });
     res.redirect(authUrl);
   });
 
+  // Step 2: Callback
   router.get("/api/auth/google/callback", async (req, res) => {
     const code = req.query.code;
     if (!code) return res.status(400).send("No code received");
@@ -124,12 +138,23 @@ if (oAuth2Client) {
       const { tokens } = await oAuth2Client.getToken(code);
       oAuth2Client.setCredentials(tokens);
 
-      // Optionally save token locally for development
+      // Save token locally in dev
       if (process.env.NODE_ENV !== "production") {
-        fs.writeFileSync(path.join(process.cwd(), "config", "token.json"), JSON.stringify(tokens));
+        fs.writeFileSync(
+          path.join(process.cwd(), "config", "token.json"),
+          JSON.stringify(tokens, null, 2)
+        );
       }
 
-      res.send("✅ Google Drive connected! Token generated successfully.");
+      // Print to console (for Render logs)
+      console.log("📌 Google Tokens:", JSON.stringify(tokens, null, 2));
+
+      // Show on page (so you can copy to Render env var)
+      res.send(`
+        <h2>✅ Google Drive connected!</h2>
+        <p>Copy this JSON and add it to Render environment variable <b>GOOGLE_TOKEN_JSON</b>:</p>
+        <pre>${JSON.stringify(tokens, null, 2)}</pre>
+      `);
     } catch (err) {
       console.error("Error generating token:", err.message);
       res.status(500).send("Error generating token");
